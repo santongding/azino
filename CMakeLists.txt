@@ -94,6 +94,9 @@ FOREACH(FIL ${protobuf_files})
     file(COPY ${PROTO_HDRS} DESTINATION ${FILE_PATH})
 ENDFOREACH()
 
+# build gtest
+add_subdirectory(third_party/googletest)
+
 # build every component
 add_subdirectory(storage)
 

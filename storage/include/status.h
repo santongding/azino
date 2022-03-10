@@ -7,6 +7,10 @@
 #include <memory>
 #include <cstring>
 
+namespace leveldb {
+    class Status;
+}
+
 namespace azino {
 namespace storage {
     class Status {
@@ -20,6 +24,9 @@ namespace storage {
 
         Status(Status&& rhs) noexcept : state_(rhs.state_) { rhs.state_ = nullptr; }
         Status& operator=(Status&& rhs) noexcept;
+
+        // status translation for each DB impl
+        static Status LevelDBStatus(const leveldb::Status& rhs);
 
         // Return a success status.
         static Status OK() { return Status(); }
@@ -107,7 +114,7 @@ namespace storage {
         return *this;
     }
 
-    const char* Status::CopyState(const char* state) {
+    inline const char* Status::CopyState(const char* state) {
         uint32_t size;
         std::memcpy(&size, state, sizeof(size));
         char* result = new char[size + 5];
@@ -115,7 +122,7 @@ namespace storage {
         return result;
     }
 
-    Status::Status(Code code, const std::string& msg, const std::string& msg2) {
+    inline Status::Status(Code code, const std::string& msg, const std::string& msg2) {
         assert(code != kOk);
         const uint32_t len1 = static_cast<uint32_t>(msg.size());
         const uint32_t len2 = static_cast<uint32_t>(msg2.size());
@@ -132,7 +139,7 @@ namespace storage {
         state_ = result;
     }
 
-    std::string Status::ToString() const {
+    inline std::string Status::ToString() const {
         if (state_ == nullptr) {
             return "OK";
         } else {
