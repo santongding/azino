@@ -69,5 +69,33 @@ set(DYNAMIC_LIB
         dl
         )
 
+
+file(GLOB protobuf_files
+        service/*.proto
+        service/storage/*.proto)
+SET(PROTO_META_BASE_DIR ${CMAKE_CURRENT_BINARY_DIR})
+LIST(APPEND PROTO_FLAGS -I${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(${CMAKE_SOURCE_DIR})
+FOREACH(FIL ${protobuf_files})
+    GET_FILENAME_COMPONENT(FIL_WE ${FIL} NAME_WE)
+    string(REGEX REPLACE ".+/(.+)\\..*" "\\1" FILE_NAME ${FIL})
+    string(REGEX REPLACE "(.+)\\${FILE_NAME}.*" "\\1" FILE_PATH ${FIL})
+    string(REGEX MATCH "(/service/storage.*|/service.*)" OUT_PATH ${FILE_PATH})
+
+    set(PROTO_SRCS "${CMAKE_CURRENT_BINARY_DIR}${OUT_PATH}${FIL_WE}.pb.cc")
+    set(PROTO_HDRS "${CMAKE_CURRENT_BINARY_DIR}${OUT_PATH}${FIL_WE}.pb.h")
+
+    EXECUTE_PROCESS(
+            COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} ${PROTO_FLAGS} --cpp_out=${PROTO_META_BASE_DIR} ${FIL}
+    )
+
+    message("Copying " ${PROTO_SRCS} " " ${PROTO_HDRS}" to " ${FILE_PATH})
+    file(COPY ${PROTO_SRCS} DESTINATION ${FILE_PATH})
+    file(COPY ${PROTO_HDRS} DESTINATION ${FILE_PATH})
+ENDFOREACH()
+
+# build every component
+add_subdirectory(storage)
+
 # build example
 add_subdirectory(example/echo_c++)
