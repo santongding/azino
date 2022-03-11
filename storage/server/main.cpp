@@ -44,7 +44,13 @@ namespace storage {
                 ssts->set_error_code(static_cast<StorageStatus_Code>(sts.code()));
                 ssts->set_error_message(sts.ToString());
                 response->set_allocated_status(ssts);
+                LOG(WARNING) << cntl->remote_side() << " Fail to put key: " << request->key()
+                        << " value: " << request->value() << " error message: " << sts.ToString();
+            } else {
+                LOG(INFO) << cntl->remote_side() << " Success to put key: " << request->key()
+                        << " value: " << request->value();
             }
+
         }
 
         virtual void Get(::google::protobuf::RpcController* controller,
@@ -61,8 +67,13 @@ namespace storage {
                 ssts->set_error_code(static_cast<StorageStatus_Code>(sts.code()));
                 ssts->set_error_message(sts.ToString());
                 response->set_allocated_status(ssts);
+                LOG(WARNING) << cntl->remote_side() << " Fail to get key: " << request->key()
+                        << " error message: " << sts.ToString();
+            } else {
+                LOG(INFO) << cntl->remote_side() << " Success to get key: " << request->key()
+                        << " value: " << value;
+                response->set_value(value);
             }
-            response->set_value(value);
         }
 
         virtual void Delete(::google::protobuf::RpcController* controller,
@@ -78,6 +89,10 @@ namespace storage {
                 ssts->set_error_code(static_cast<StorageStatus_Code>(sts.code()));
                 ssts->set_error_message(sts.ToString());
                 response->set_allocated_status(ssts);
+                LOG(WARNING) << cntl->remote_side() << " Fail to delete key: " << request->key()
+                        << " error message: " << sts.ToString();
+            } else {
+                LOG(INFO) << cntl->remote_side() << " Success to delete key: " << request->key();
             }
         }
     private:
@@ -87,7 +102,25 @@ namespace storage {
 } // namespace azino
 
 int main(int argc, char* argv[]) {
-    std::string s;
+    GFLAGS_NS::ParseCommandLineFlags(&argc, &argv, true);
+
+    brpc::Server server;
+
+    azino::storage::StorageServiceImpl storage_service_impl;
+    if (server.AddService(&storage_service_impl,
+                          brpc::SERVER_DOESNT_OWN_SERVICE) != 0) {
+        LOG(ERROR) << "Fail to add storage_service_impl";
+        return -1;
+    }
+
+    brpc::ServerOptions options;
+    options.idle_timeout_sec = FLAGS_idle_timeout_s;
+    if (server.Start(FLAGS_port, &options) != 0) {
+        LOG(ERROR) << "Fail to start StorageServer";
+        return -1;
+    }
+
+    server.RunUntilAskedToQuit();
     return 0;
 }
 
