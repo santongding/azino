@@ -70,7 +70,6 @@ namespace storage {
         // Returns the string "OK" for success.
         std::string ToString() const;
 
-        private:
         enum Code {
             kOk = 0,
             kNotFound = 1,
@@ -84,6 +83,7 @@ namespace storage {
             return (state_ == nullptr) ? kOk : static_cast<Code>(state_[4]);
         }
 
+        private:
         Status(Code code, const std::string& msg, const std::string& msg2);
         static const char* CopyState(const char* s);
 
