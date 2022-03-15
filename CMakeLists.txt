@@ -99,6 +99,7 @@ add_subdirectory(third_party/googletest)
 
 # build every component
 add_subdirectory(storage)
+add_subdirectory(client)
 
 # build example
 add_subdirectory(example/echo_c++)

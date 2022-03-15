@@ -6,12 +6,8 @@
 #include "db.h"
 #include "service/storage/storage.pb.h"
 
-DEFINE_int32(port, 8000, "TCP Port of this server");
+DEFINE_string(server, "0.0.0.0:8000", "Address of server");
 DEFINE_string(db_name, "azino_storage", "default name of azino's storage(leveldb)");
-DEFINE_int32(idle_timeout_s, -1, "Connection will be closed if there is no "
-"read/write operations during the last `idle_timeout_s'");
-DEFINE_int32(logoff_ms, 2000, "Maximum duration of server's LOGOFF state "
-"(waiting for client to close connection before server stops)");
 
 namespace azino {
 namespace storage {
@@ -45,6 +41,7 @@ namespace storage {
                 ssts->set_error_message(sts.ToString());
                 response->set_allocated_status(ssts);
                 LOG(WARNING) << cntl->remote_side() << " Fail to put key: " << request->key()
+                        << " error code: " << sts.code()
                         << " value: " << request->value() << " error message: " << sts.ToString();
             } else {
                 LOG(INFO) << cntl->remote_side() << " Success to put key: " << request->key()
@@ -68,6 +65,7 @@ namespace storage {
                 ssts->set_error_message(sts.ToString());
                 response->set_allocated_status(ssts);
                 LOG(WARNING) << cntl->remote_side() << " Fail to get key: " << request->key()
+                        << " error code: " << sts.code()
                         << " error message: " << sts.ToString();
             } else {
                 LOG(INFO) << cntl->remote_side() << " Success to get key: " << request->key()
@@ -90,6 +88,7 @@ namespace storage {
                 ssts->set_error_message(sts.ToString());
                 response->set_allocated_status(ssts);
                 LOG(WARNING) << cntl->remote_side() << " Fail to delete key: " << request->key()
+                        << " error code: " << sts.code()
                         << " error message: " << sts.ToString();
             } else {
                 LOG(INFO) << cntl->remote_side() << " Success to delete key: " << request->key();
@@ -114,8 +113,7 @@ int main(int argc, char* argv[]) {
     }
 
     brpc::ServerOptions options;
-    options.idle_timeout_sec = FLAGS_idle_timeout_s;
-    if (server.Start(FLAGS_port, &options) != 0) {
+    if (server.Start(FLAGS_server.c_str(), &options) != 0) {
         LOG(ERROR) << "Fail to start StorageServer";
         return -1;
     }
