@@ -3,23 +3,23 @@
 #include <brpc/server.h>
 #include <toml/toml.hpp>
 
-#include "db.h"
+#include "storage.h"
 #include "service/storage/storage.pb.h"
 
 DEFINE_string(server, "0.0.0.0:8000", "Address of server");
-DEFINE_string(db_name, "azino_storage", "default name of azino's storage(leveldb)");
+DEFINE_string(storage_name, "azino_storage", "default name of azino's storage(leveldb)");
 
 namespace azino {
 namespace storage {
     class StorageServiceImpl : public StorageService {
     public:
-        StorageServiceImpl() : _db(DB::DefaultDB()) {
-            Status sts = _db->Open(FLAGS_db_name);
-            if (!sts.ok()) {
-                LOG(FATAL) << "Fail to open db: " << FLAGS_db_name
-                            << ", error text: " << sts.ToString();
+        StorageServiceImpl() : _storage(Storage::DefaultStorage()) {
+            StorageStatus ss = _storage->Open(FLAGS_storage_name);
+            if (ss.error_code() != StorageStatus::Ok) {
+                LOG(FATAL) << "Fail to open storage: " << FLAGS_storage_name
+                            << ", error text: " << ss.error_message();
             } else {
-                LOG(INFO) << "Successes to open db: " << FLAGS_db_name;
+                LOG(INFO) << "Successes to open storage: " << FLAGS_storage_name;
             }
         }
 
@@ -34,15 +34,13 @@ namespace storage {
             brpc::ClosureGuard done_guard(done);
             brpc::Controller* cntl = static_cast<brpc::Controller*>(controller);
 
-            Status sts = _db->Put(request->key(), request->value());
-            if (!sts.ok()) {
-                StorageStatus* ssts = new StorageStatus();
-                ssts->set_error_code(static_cast<StorageStatus_Code>(sts.code()));
-                ssts->set_error_message(sts.ToString());
+            StorageStatus ss = _storage->Put(request->key(), request->value());
+            if (ss.error_code() != StorageStatus::Ok) {
+                StorageStatus* ssts = new StorageStatus(ss);
                 response->set_allocated_status(ssts);
                 LOG(WARNING) << cntl->remote_side() << " Fail to put key: " << request->key()
-                        << " error code: " << sts.code()
-                        << " value: " << request->value() << " error message: " << sts.ToString();
+                        << " error code: " << ss.error_code()
+                        << " value: " << request->value() << " error message: " << ss.error_message();
             } else {
                 LOG(INFO) << cntl->remote_side() << " Success to put key: " << request->key()
                         << " value: " << request->value();
@@ -58,15 +56,13 @@ namespace storage {
             brpc::Controller* cntl = static_cast<brpc::Controller*>(controller);
 
             std::string value;
-            Status sts = _db->Get(request->key(), value);
-            if (!sts.ok()) {
-                StorageStatus* ssts = new StorageStatus();
-                ssts->set_error_code(static_cast<StorageStatus_Code>(sts.code()));
-                ssts->set_error_message(sts.ToString());
+            StorageStatus ss = _storage->Get(request->key(), value);
+            if (ss.error_code() != StorageStatus::Ok) {
+                StorageStatus* ssts = new StorageStatus(ss);
                 response->set_allocated_status(ssts);
                 LOG(WARNING) << cntl->remote_side() << " Fail to get key: " << request->key()
-                        << " error code: " << sts.code()
-                        << " error message: " << sts.ToString();
+                        << " error code: " << ss.error_code()
+                        << " error message: " << ss.error_message();
             } else {
                 LOG(INFO) << cntl->remote_side() << " Success to get key: " << request->key()
                         << " value: " << value;
@@ -81,21 +77,19 @@ namespace storage {
             brpc::ClosureGuard done_guard(done);
             brpc::Controller* cntl = static_cast<brpc::Controller*>(controller);
 
-            Status sts = _db->Delete(request->key());
-            if (!sts.ok()) {
-                StorageStatus* ssts = new StorageStatus();
-                ssts->set_error_code(static_cast<StorageStatus_Code>(sts.code()));
-                ssts->set_error_message(sts.ToString());
+            StorageStatus ss = _storage->Delete(request->key());
+            if (ss.error_code() != StorageStatus::Ok) {
+                StorageStatus* ssts = new StorageStatus(ss);
                 response->set_allocated_status(ssts);
                 LOG(WARNING) << cntl->remote_side() << " Fail to delete key: " << request->key()
-                        << " error code: " << sts.code()
-                        << " error message: " << sts.ToString();
+                        << " error code: " << ss.error_code()
+                        << " error message: " << ss.error_message();
             } else {
                 LOG(INFO) << cntl->remote_side() << " Success to delete key: " << request->key();
             }
         }
     private:
-        std::unique_ptr<DB> _db;
+        std::unique_ptr<Storage> _storage;
     };
 } // namespace storage
 } // namespace azino

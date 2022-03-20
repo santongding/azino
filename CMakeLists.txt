@@ -100,6 +100,7 @@ add_subdirectory(third_party/googletest)
 # build every component
 add_subdirectory(storage)
 add_subdirectory(client)
+add_subdirectory(txindex)
 
-# build example
+# build brpc examples
 add_subdirectory(example/echo_c++)

@@ -12,7 +12,8 @@ target_link_libraries(storage_server ${BRPC_LIB} ${DYNAMIC_LIB})
 enable_testing()
 
 add_executable(test_dbimpl  ${PROJECT_SOURCE_DIR}/test/test_dbimpl.cpp
-                            ${PROJECT_SOURCE_DIR}/leveldb/dbimpl.cpp)
+                            ${PROJECT_SOURCE_DIR}/leveldb/dbimpl.cpp
+                            ${CMAKE_SOURCE_DIR}/service/storage/storage.pb.cc)
 target_link_libraries(test_dbimpl
                         gtest_main
                         ${BRPC_LIB}

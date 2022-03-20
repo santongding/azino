@@ -1,13 +1,15 @@
 #include <leveldb/db.h>
 #include <memory>
 
-#include "db.h"
+#include "storage.h"
 
 namespace azino {
 namespace storage {
 namespace {
 
-    class LevelDBImpl : public DB {
+    StorageStatus LevelDBStatus(const leveldb::Status &lss);
+    
+    class LevelDBImpl : public Storage {
     public:
         LevelDBImpl() : _leveldbptr(nullptr) {}
         LevelDBImpl(const LevelDBImpl&) = delete;
@@ -15,9 +17,12 @@ namespace {
 
         virtual ~LevelDBImpl() = default;
 
-        virtual Status Open(const std::string& name) override {
+        virtual StorageStatus Open(const std::string& name) override {
             if (_leveldbptr != nullptr) {
-                return Status::InvalidArgument("Already opened an leveldb");
+                StorageStatus ss;
+                ss.set_error_code(StorageStatus::InvalidArgument);
+                ss.set_error_message("Already opened an leveldb");
+                return ss;
             }
             leveldb::DB* leveldbptr;
             leveldb::Options opt;
@@ -27,34 +32,40 @@ namespace {
             if (leveldbstatus.ok()) {
                 _leveldbptr.reset(leveldbptr);
             }
-            return Status::LevelDBStatus(leveldbstatus);
+            return LevelDBStatus(leveldbstatus);
         }
 
         // Set the database entry for "key" to "value".  Returns OK on success,
         // and a non-OK status on error.
-        virtual Status Put(const std::string& key, const std::string& value) override {
+        virtual StorageStatus Put(const std::string& key, const std::string& value) override {
             if (_leveldbptr == nullptr) {
-                return Status::InvalidArgument("No opened leveldb");
+                StorageStatus ss;
+                ss.set_error_code(StorageStatus::InvalidArgument);
+                ss.set_error_message("Already opened an leveldb");
+                return ss;
             }
             leveldb::WriteOptions opts;
             opts.sync = true;
             leveldb::Status leveldbstatus;
             leveldbstatus = _leveldbptr->Put(opts, key, value);
-            return Status::LevelDBStatus(leveldbstatus);
+            return LevelDBStatus(leveldbstatus);
         }
 
         // Remove the database entry (if any) for "key".  Returns OK on
         // success, and a non-OK status on error.  It is not an error if "key"
         // did not exist in the database.
-        virtual Status Delete(const std::string& key) override {
+        virtual StorageStatus Delete(const std::string& key) override {
             if (_leveldbptr == nullptr) {
-                return Status::InvalidArgument("No opened leveldb");
+                StorageStatus ss;
+                ss.set_error_code(StorageStatus::InvalidArgument);
+                ss.set_error_message("Already opened an leveldb");
+                return ss;
             }
             leveldb::WriteOptions opts;
             opts.sync = true;
             leveldb::Status leveldbstatus;
             leveldbstatus = _leveldbptr->Delete(opts, key);
-            return Status::LevelDBStatus(leveldbstatus);
+            return LevelDBStatus(leveldbstatus);
         }
 
         // If the database contains an entry for "key" store the
@@ -64,39 +75,49 @@ namespace {
         // a status for which Status::IsNotFound() returns true.
         //
         // May return some other Status on an error.
-        virtual Status Get(const std::string& key, std::string& value) override {
+        virtual StorageStatus Get(const std::string& key, std::string& value) override {
             if (_leveldbptr == nullptr) {
-                return Status::InvalidArgument("No opened leveldb");
+                StorageStatus ss;
+                ss.set_error_code(StorageStatus::InvalidArgument);
+                ss.set_error_message("Already opened an leveldb");
+                return ss;
             }
             leveldb::ReadOptions opt;
             opt.verify_checksums = true;
             leveldb::Status leveldbstatus;
             leveldbstatus = _leveldbptr->Get(opt, key, &value);
-            return Status::LevelDBStatus(leveldbstatus);
+            return LevelDBStatus(leveldbstatus);
         }
 
     private:
         std::unique_ptr<leveldb::DB> _leveldbptr;
     };
+
+    StorageStatus LevelDBStatus(const leveldb::Status &lss) {
+        StorageStatus ss;
+        if (lss.ok()) {
+            ss.set_error_code(StorageStatus::Ok);
+        } else if (lss.IsCorruption()) {
+            ss.set_error_code(StorageStatus::Corruption);
+            ss.set_error_message(lss.ToString());
+        } else if (lss.IsIOError()) {
+            ss.set_error_code(StorageStatus::IOError);
+            ss.set_error_message(lss.ToString());
+        } else if (lss.IsInvalidArgument()) {
+            ss.set_error_code(StorageStatus::InvalidArgument);
+            ss.set_error_message(lss.ToString());
+        } else if (lss.IsNotFound()) {
+            ss.set_error_code(StorageStatus::NotFound);
+            ss.set_error_message(lss.ToString());
+        } else {
+            ss.set_error_code(StorageStatus::NotSupported);
+            ss.set_error_message(lss.ToString());
+        }
+        return ss;
+    }
 } // namespace
 
-    Status Status::LevelDBStatus(const leveldb::Status &rhs) {
-        if (rhs.ok()) {
-            return Status::OK();
-        } else if (rhs.IsCorruption()) {
-            return Status::Corruption(rhs.ToString());
-        } else if (rhs.IsIOError()) {
-            return Status::IOError(rhs.ToString());
-        } else if (rhs.IsInvalidArgument()) {
-            return Status::InvalidArgument(rhs.ToString());
-        } else if (rhs.IsNotFound()) {
-            return Status::NotFound(rhs.ToString());
-        } else {
-            return Status::NotSupported(rhs.ToString());
-        }
-    }
-
-    DB *DB::DefaultDB() {
+    Storage *Storage::DefaultStorage() {
         return new LevelDBImpl();
     }
 } // namespace storage
