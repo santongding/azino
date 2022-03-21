@@ -15,8 +15,10 @@ namespace storage {
 
         Storage() = default;
 
-        Storage(const Storage&) = delete;
-        Storage& operator=(const Storage&) = delete;
+        Storage(const Storage& rhs) = delete;
+        Storage& operator=(const Storage& rhs) = delete;
+        Storage(Storage&& rhs) = delete;
+        Storage& operator=(Storage&& rhs) = delete;
 
         virtual ~Storage() = default;
 

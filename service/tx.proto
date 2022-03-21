@@ -1,0 +1,26 @@
+syntax="proto2";
+package azino;
+
+message TxOpStatus {
+  enum Code {
+    Ok = 0;
+    WriteConflicts = 1;
+    WriteTooLate = 2;
+    WriteBlock = 3;
+    ReadNotExist = 4;
+    ReadDeleted = 5;
+    ReadBlock = 6;
+  };
+  optional Code error_code = 1 [default = Ok];
+  optional string error_message = 2;
+}
+
+message TxStatus {
+
+}
+
+message TxIdentifier {
+  optional uint64 start_ts = 1;
+  optional uint64 commit_ts = 2;
+  optional TxStatus status = 3;
+}

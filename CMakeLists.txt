@@ -93,6 +93,13 @@ FOREACH(FIL ${protobuf_files})
     file(COPY ${PROTO_SRCS} DESTINATION ${FILE_PATH})
     file(COPY ${PROTO_HDRS} DESTINATION ${FILE_PATH})
 ENDFOREACH()
+file(GLOB protobuf_srcs
+        service/*.pb.cc
+        service/storage/*.pb.cc)
+
+
+add_library(${PROJECT_NAME} STATIC ${protobuf_srcs})
+add_library(azino::lib ALIAS ${PROJECT_NAME})
 
 # build gtest
 add_subdirectory(third_party/googletest)
