@@ -12,9 +12,7 @@ namespace {
     class LevelDBImpl : public Storage {
     public:
         LevelDBImpl() : _leveldbptr(nullptr) {}
-        LevelDBImpl(const LevelDBImpl&) = delete;
-        LevelDBImpl& operator=(const LevelDBImpl&) = delete;
-
+        DISALLOW_COPY_AND_ASSIGN(LevelDBImpl);
         virtual ~LevelDBImpl() = default;
 
         virtual StorageStatus Open(const std::string& name) override {

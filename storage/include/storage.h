@@ -3,6 +3,7 @@
 #define AZINO_STORAGE_INCLUDE_STORAGE_H
 
 #include <string>
+#include <butil/macros.h>
 #include "service/storage/storage.pb.h"
 
 namespace azino {
@@ -14,12 +15,7 @@ namespace storage {
         static Storage* DefaultStorage();
 
         Storage() = default;
-
-        Storage(const Storage& rhs) = delete;
-        Storage& operator=(const Storage& rhs) = delete;
-        Storage(Storage&& rhs) = delete;
-        Storage& operator=(Storage&& rhs) = delete;
-
+        DISALLOW_COPY_AND_ASSIGN(Storage);
         virtual ~Storage() = default;
 
         virtual StorageStatus Open(const std::string& name) = 0;

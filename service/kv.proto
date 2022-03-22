@@ -1,0 +1,7 @@
+syntax="proto2";
+package azino;
+
+message Value {
+  optional bool is_delete = 1 [default = false];
+  optional string content = 2;
+}
