@@ -3,6 +3,7 @@
 #include <butil/hash.h>
 #include <butil/containers/flat_map.h>
 #include <functional>
+#include <memory>
 #include <unordered_map>
 
 #include "index.h"
@@ -168,9 +169,65 @@ public:
         return sts;
     }
 
+    virtual TxOpStatus Clean(const UserKey& key, const TxIdentifier& txid) override {
+        std::lock_guard<bthread::Mutex> lck(_latch);
+
+        TxOpStatus sts;
+        std::stringstream ss;
+        auto iter = _kvs.find(key);
+        if (iter == _kvs.end()
+            || (!iter->second->HasLock() && !iter->second->HasIntent())
+            || iter->second->Holder().start_ts() != txid.start_ts()) {
+            assert(!(mv->HasIntent() && mv->HasLock()));
+            ss << "Tx(" << txid.ShortDebugString() << ") clean on " << "\"" << key  << "\"" << " not exist. ";
+            if (iter->second->HasLock() || iter->second->HasIntent()) {
+                ss << "Find " << (iter->second->HasLock() ? "lock" : "intent") << " Tx(" << iter->second->Holder().ShortDebugString() << ") value: "
+                   << iter->second->TmpValue()->ShortDebugString();
+            }
+            sts.set_error_code(TxOpStatus_Code_CleanNotExist);
+            sts.set_error_message(ss.str());
+            LOG(WARNING) << ss.str();
+            return sts;
+        }
+
+        ss << "Tx(" << txid.ShortDebugString() << ") clean on " << "\"" << key  << "\"" << " success. "
+           << "Find "<< (iter->second->HasLock() ? "lock" : "intent") << " Tx(" << iter->second->Holder().ShortDebugString() << ") value: "
+           << iter->second->TmpValue()->ShortDebugString();
+        sts.set_error_code(TxOpStatus_Code_Ok);
+        sts.set_error_message(ss.str());
+        LOG(INFO) << ss.str();
+
+        iter->second->_holder.Clear();
+        iter->second->_tmp_value.reset(nullptr);
+        iter->second->_has_intent = false;
+        iter->second->_has_lock = false;
+
+        // TODO: run callbacks for this key here
+        return sts;
+    }
+
+    virtual TxOpStatus Commit(const UserKey& key, const TxIdentifier& txid) override {
+        std::lock_guard<bthread::Mutex> lck(_latch);
+
+        TxOpStatus sts;
+        std::stringstream ss;
+
+        return sts;
+    }
+
     virtual TxOpStatus Read(const UserKey& key, Value& v, const TxIdentifier& txid, std::function<void()> callback) override {
         std::lock_guard<bthread::Mutex> lck(_latch);
-        return TxOpStatus();
+
+        TxOpStatus sts;
+        std::stringstream ss;
+        if (_kvs.find(key) == _kvs.end()) {
+            ss << "Tx(" << txid.ShortDebugString() << ") read on " << "\"" << key  << "\"" << " not exist. ";
+            sts.set_error_code(TxOpStatus_Code_ReadNotExist);
+            sts.set_error_message(ss.str());
+            LOG(INFO) << ss.str();
+            return sts;
+        }
+        return sts;
     }
 
 private:
@@ -183,11 +240,8 @@ private:
 
 class TxIndexImpl : public txindex::TxIndex {
 public:
-    TxIndexImpl() {
-        for (int i = 0; i < FLAGS_latch_bucket_num; i++) {
-            _kvbs.emplace_back(new KVBucket);
-        }
-    }
+    TxIndexImpl() :
+    _kvbs(FLAGS_latch_bucket_num, std::make_shared<KVBucket>()) { }
     DISALLOW_COPY_AND_ASSIGN(TxIndexImpl);
     ~TxIndexImpl() = default;
 
@@ -201,13 +255,23 @@ public:
         return _kvbs[bucket_num]->WriteIntent(key, v, txid);
     }
 
+    virtual TxOpStatus Clean(const UserKey& key, const TxIdentifier& txid) override {
+        auto bucket_num = butil::Hash(key) % FLAGS_latch_bucket_num;
+        return _kvbs[bucket_num]->Clean(key, txid);
+    }
+
+    virtual TxOpStatus Commit(const UserKey& key, const TxIdentifier& txid) override {
+        auto bucket_num = butil::Hash(key) % FLAGS_latch_bucket_num;
+        return _kvbs[bucket_num]->Commit(key, txid);
+    }
+
     virtual TxOpStatus Read(const UserKey& key, Value& v, const TxIdentifier& txid, std::function<void()> callback) override {
         auto bucket_num = butil::Hash(key) % FLAGS_latch_bucket_num;
         return _kvbs[bucket_num]->Read(key, v, txid, callback);
     }
 
 private:
-    std::vector<std::unique_ptr<KVBucket>> _kvbs;
+    std::vector<std::shared_ptr<KVBucket>> _kvbs;
 };
 
 } // namespace

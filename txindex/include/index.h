@@ -29,6 +29,14 @@ namespace txindex {
         // Should success if txid already hold this intent or lock, and change lock to intent at the same time.
         virtual TxOpStatus WriteIntent(const UserKey& key, const Value& v, const TxIdentifier& txid) = 0;
 
+        // This is an atomic read-write operation for one user_key, used in both pessimistic and optimistic transactions.
+        // Success when it finds and cleans this tx's intent or lock for this key
+        virtual TxOpStatus Clean(const UserKey& key, const TxIdentifier& txid) = 0;
+
+        // This is an atomic read-write operation for one user_key, used in both pessimistic and optimistic transactions.
+        // Success when it finds and commit this tx's intent for this key
+        virtual TxOpStatus Commit(const UserKey& key, const TxIdentifier& txid) = 0;
+
         // Current implementation uses snapshot isolation.
         // read will be blocked if there exists and intent who has a smaller ts than read's ts.
         // read will bypass any lock, and return the key value pair who has the biggest ts among all that have ts smaller than read's ts.
