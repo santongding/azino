@@ -4,6 +4,7 @@
 #include <toml/toml.hpp>
 
 #include "index.h"
+#include "service.h"
 
 namespace azino {
 namespace txindex {
