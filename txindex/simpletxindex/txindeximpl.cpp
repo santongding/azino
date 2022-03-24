@@ -5,10 +5,18 @@
 #include <functional>
 #include <memory>
 #include <unordered_map>
+#include <bthread/bthread.h>
 
 #include "index.h"
 
 DEFINE_int32(latch_bucket_num, 1024, "latch buckets number");
+
+extern "C" void* CallbackWrapper(void* arg) {
+    auto* func = reinterpret_cast<std::function<void()>*>(arg);
+    func->operator()();
+    delete func;
+    return nullptr;
+}
 
 namespace azino {
 namespace {
@@ -178,9 +186,9 @@ public:
         if (iter == _kvs.end()
             || (!iter->second->HasLock() && !iter->second->HasIntent())
             || iter->second->Holder().start_ts() != txid.start_ts()) {
-            assert(!(mv->HasIntent() && mv->HasLock()));
             ss << "Tx(" << txid.ShortDebugString() << ") clean on " << "\"" << key  << "\"" << " not exist. ";
-            if (iter->second->HasLock() || iter->second->HasIntent()) {
+            if (iter != _kvs.end()) {
+                assert(!(iter->second->HasIntent() && iter->second->HasLock()));
                 ss << "Find " << (iter->second->HasLock() ? "lock" : "intent") << " Tx(" << iter->second->Holder().ShortDebugString() << ") value: "
                    << iter->second->TmpValue()->ShortDebugString();
             }
@@ -202,7 +210,18 @@ public:
         iter->second->_has_intent = false;
         iter->second->_has_lock = false;
 
-        // TODO: run callbacks for this key here
+        if (_blocked_ops.find(key) != _blocked_ops.end()) {
+            auto iter = _blocked_ops.find(key);
+            for (auto& func : iter->second) {
+                bthread_t bid;
+                auto* arg = new std::function<void()>(func);
+                if (bthread_start_background(&bid, nullptr, CallbackWrapper, arg) != 0) {
+                    LOG(FATAL) << "Failed to start callback.";
+                }
+            }
+            iter->second.clear();
+        }
+
         return sts;
     }
 
@@ -211,6 +230,45 @@ public:
 
         TxOpStatus sts;
         std::stringstream ss;
+        auto iter = _kvs.find(key);
+        if (iter == _kvs.end()
+            || !iter->second->HasIntent()
+            || iter->second->Holder().start_ts() != txid.start_ts()) {
+            ss << "Tx(" << txid.ShortDebugString() << ") commit on " << "\"" << key  << "\"" << " not exist. ";
+            if (iter != _kvs.end()) {
+                assert(!(iter->second->HasIntent() && iter->second->HasLock()));
+                ss << "Find " << (iter->second->HasLock() ? "lock" : "intent") << " Tx(" << iter->second->Holder().ShortDebugString() << ") value: "
+                   << iter->second->TmpValue()->ShortDebugString();
+            }
+            sts.set_error_code(TxOpStatus_Code_CommitNotExist);
+            sts.set_error_message(ss.str());
+            LOG(WARNING) << ss.str();
+            return sts;
+        }
+
+        ss << "Tx(" << txid.ShortDebugString() << ") commit on " << "\"" << key  << "\"" << " success. "
+           << "Find "<< "intent" << " Tx(" << iter->second->Holder().ShortDebugString() << ") value: "
+           << iter->second->TmpValue()->ShortDebugString();
+        sts.set_error_code(TxOpStatus_Code_Ok);
+        sts.set_error_message(ss.str());
+        LOG(INFO) << ss.str();
+
+        iter->second->_holder.Clear();
+        iter->second->_t2v.insert(std::make_pair(txid.commit_ts(), std::move(iter->second->_tmp_value)));
+        iter->second->_has_intent = false;
+        iter->second->_has_lock = false;
+
+        if (_blocked_ops.find(key) != _blocked_ops.end()) {
+            auto iter = _blocked_ops.find(key);
+            for (auto& func : iter->second) {
+                bthread_t bid;
+                auto* arg = new std::function<void()>(func);
+                if (bthread_start_background(&bid, nullptr, CallbackWrapper, arg) != 0) {
+                    LOG(FATAL) << "Failed to start callback.";
+                }
+            }
+            iter->second.clear();
+        }
 
         return sts;
     }
