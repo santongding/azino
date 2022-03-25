@@ -8,10 +8,9 @@ message TxOpStatus {
     WriteTooLate = 2;
     WriteBlock = 3;
     ReadNotExist = 4;
-    ReadDeleted = 5;
-    ReadBlock = 6;
-    CleanNotExist = 7;
-    CommitNotExist = 8;
+    ReadBlock = 5;
+    CleanNotExist = 6;
+    CommitNotExist = 7;
   };
   optional Code error_code = 1 [default = Ok];
   optional string error_message = 2;

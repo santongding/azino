@@ -33,14 +33,22 @@ public:
     bool HasIntent() const { return _has_intent; }
     std::pair<TimeStamp, Value*> LargestTSValue() const {
        if (_t2v.empty()) {
-           return std::make_pair(0, nullptr);
+           return std::make_pair(MIN_TIMESTAMP, nullptr);
        }
-       auto iter = _t2v.rbegin();
+       auto iter = _t2v.begin();
        return std::make_pair(iter->first, iter->second.get());
     }
     TxIdentifier Holder() const { return _holder; }
     Value* TmpValue() const {
         return _tmp_value.get();
+    }
+    // finds greater or equal
+    std::pair<TimeStamp, Value*> Seek(TimeStamp ts) {
+        auto iter = _t2v.lower_bound(ts);
+        if (iter == _t2v.end()) {
+            return std::make_pair(MAX_TIMESTAMP, nullptr);
+        }
+        return std::make_pair(iter->first, iter->second.get());
     }
 
 private:
@@ -49,7 +57,7 @@ private:
     bool _has_intent;
     std::unique_ptr<Value> _tmp_value;
     TxIdentifier _holder;
-    std::map<TimeStamp, std::unique_ptr<Value>> _t2v;
+    std::map<TimeStamp, std::unique_ptr<Value>, std::greater<TimeStamp>> _t2v;
 };
 
 class KVBucket : public txindex::TxIndex {
@@ -278,13 +286,59 @@ public:
 
         TxOpStatus sts;
         std::stringstream ss;
-        if (_kvs.find(key) == _kvs.end()) {
+        auto iter = _kvs.find(key);
+        if (iter == _kvs.end()) {
             ss << "Tx(" << txid.ShortDebugString() << ") read on " << "\"" << key  << "\"" << " not exist. ";
             sts.set_error_code(TxOpStatus_Code_ReadNotExist);
             sts.set_error_message(ss.str());
             LOG(INFO) << ss.str();
             return sts;
         }
+
+        if ((iter->second->HasIntent() || iter->second->HasLock())
+            && iter->second->Holder().start_ts() == txid.start_ts()) {
+            assert(!(iter->second->HasIntent() && iter->second->HasLock()));
+            ss << "Tx(" << txid.ShortDebugString() << ") read on " << "\"" << key  << "\"" << " success. "
+               << "Find "<< (iter->second->HasLock() ? "lock" : "intent") << " Tx(" << iter->second->Holder().ShortDebugString() << ") value: "
+               << iter->second->TmpValue()->ShortDebugString();
+            sts.set_error_code(TxOpStatus_Code_Ok);
+            sts.set_error_message(ss.str());
+            LOG(INFO) << ss.str();
+            v.CopyFrom(*(iter->second->TmpValue()));
+            return sts;
+        }
+
+        if (iter->second->HasIntent() && iter->second->Holder().start_ts() < txid.start_ts()) {
+            assert(!iter->second->HasLock());
+            ss << "Tx(" << txid.ShortDebugString() << ") read on " << "\"" << key  << "\"" << " blocked. "
+               << "Find "<< "intent" << " Tx(" << iter->second->Holder().ShortDebugString() << ") value: "
+               << iter->second->TmpValue()->ShortDebugString();
+            sts.set_error_code(TxOpStatus_Code_ReadBlock);
+            sts.set_error_message(ss.str());
+            LOG(INFO) << ss.str();
+            if (_blocked_ops.find(key) == _blocked_ops.end()) {
+                _blocked_ops.insert(std::make_pair(key, std::vector<std::function<void()>>()));
+            }
+            _blocked_ops[key].push_back(callback);
+            return sts;
+        }
+
+        auto sv = iter->second->Seek(txid.start_ts());
+        if (sv.first <= txid.start_ts()) {
+            ss << "Tx(" << txid.ShortDebugString() << ") read on " << "\"" << key  << "\"" << " success. "
+               << "Find " << "ts: " << sv.first << " value: "
+               << sv.second->ShortDebugString();
+            sts.set_error_code(TxOpStatus_Code_Ok);
+            sts.set_error_message(ss.str());
+            LOG(INFO) << ss.str();
+            v.CopyFrom(*(sv.second));
+            return sts;
+        }
+
+        ss << "Tx(" << txid.ShortDebugString() << ") read on " << "\"" << key  << "\"" << " not exist. ";
+        sts.set_error_code(TxOpStatus_Code_ReadNotExist);
+        sts.set_error_message(ss.str());
+        LOG(INFO) << ss.str();
         return sts;
     }
 

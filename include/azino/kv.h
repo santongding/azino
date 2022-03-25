@@ -5,6 +5,8 @@
 
 namespace azino {
     typedef uint64_t TimeStamp;
+    #define MAX_TIMESTAMP UINT64_MAX
+    #define MIN_TIMESTAMP 0
     typedef std::string UserKey;
 
 } // namespace azino

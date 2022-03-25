@@ -164,17 +164,68 @@ TEST_F(TxIndexImplTest, commit_ok) {
 }
 
 TEST_F(TxIndexImplTest, read_ok) {
+    ASSERT_EQ(azino::TxOpStatus_Code_Ok, ti->WriteIntent(k1, v1, t1).error_code());
+    t1.set_commit_ts(3);
+    ASSERT_EQ(azino::TxOpStatus_Code_Ok, ti->Commit(k1, t1).error_code());
+    azino::Value read_value;
+    azino::TxIdentifier read_tx;
+    read_tx.set_start_ts(4);
+    ASSERT_EQ(azino::TxOpStatus_Code_Ok, ti->Read(k1, read_value, read_tx, std::bind(&TxIndexImplTest::dummyCallback, this)).error_code());
+    ASSERT_EQ(v1.content(), read_value.content());
 
+    azino::TxIdentifier t3;
+    t3.set_start_ts(4);
+    ASSERT_EQ(azino::TxOpStatus_Code_Ok, ti->WriteIntent(k1, v2, t3).error_code());
+    t3.set_commit_ts(5);
+    ASSERT_EQ(azino::TxOpStatus_Code_Ok, ti->Commit(k1, t3).error_code());
+    ASSERT_EQ(azino::TxOpStatus_Code_Ok, ti->Read(k1, read_value, read_tx, std::bind(&TxIndexImplTest::dummyCallback, this)).error_code());
+    ASSERT_EQ(v1.content(), read_value.content());
+    read_tx.set_start_ts(5);
+    ASSERT_EQ(azino::TxOpStatus_Code_Ok, ti->Read(k1, read_value, read_tx, std::bind(&TxIndexImplTest::dummyCallback, this)).error_code());
+    ASSERT_EQ(v2.content(), read_value.content());
 }
 
 TEST_F(TxIndexImplTest, read_block) {
-
+    ASSERT_EQ(azino::TxOpStatus_Code_Ok, ti->WriteIntent(k1, v1, t1).error_code());
+    t1.set_commit_ts(2);
+    ASSERT_EQ(azino::TxOpStatus_Code_Ok, ti->Commit(k1, t1).error_code());
+    azino::TxIdentifier read_tx_3;
+    read_tx_3.set_start_ts(3);
+    azino::TxIdentifier read_tx_6;
+    read_tx_6.set_start_ts(6);
+    azino::TxIdentifier t3;
+    t3.set_start_ts(4);
+    ASSERT_EQ(azino::TxOpStatus_Code_Ok, ti->WriteLock(k1, v2, t3, std::bind(&TxIndexImplTest::dummyCallback, this)).error_code());
+    azino::Value read_value;
+    ASSERT_EQ(azino::TxOpStatus_Code_Ok, ti->Read(k1, read_value, read_tx_3, std::bind(&TxIndexImplTest::dummyCallback, this)).error_code());
+    ASSERT_EQ(v1.content(), read_value.content());
+    ASSERT_EQ(azino::TxOpStatus_Code_Ok, ti->Read(k1, read_value, read_tx_6, std::bind(&TxIndexImplTest::dummyCallback, this)).error_code());
+    ASSERT_EQ(v1.content(), read_value.content());
+    ASSERT_EQ(azino::TxOpStatus_Code_Ok, ti->WriteIntent(k1, v2, t3).error_code());
+    ASSERT_EQ(azino::TxOpStatus_Code_Ok, ti->Read(k1, read_value, read_tx_3, std::bind(&TxIndexImplTest::dummyCallback, this)).error_code());
+    ASSERT_EQ(v1.content(), read_value.content());
+    ASSERT_EQ(azino::TxOpStatus_Code_ReadBlock, ti->Read(k1, read_value, read_tx_6, std::bind(&TxIndexImplTest::dummyCallback, this)).error_code());
+    t3.set_commit_ts(5);
+    ASSERT_EQ(azino::TxOpStatus_Code_Ok, ti->Commit(k1, t3).error_code());
+    waitDummyCallback();
+    ASSERT_TRUE(Called());
+    ASSERT_EQ(azino::TxOpStatus_Code_Ok, ti->Read(k1, read_value, read_tx_3, std::bind(&TxIndexImplTest::dummyCallback, this)).error_code());
+    ASSERT_EQ(v1.content(), read_value.content());
+    ASSERT_EQ(azino::TxOpStatus_Code_Ok, ti->Read(k1, read_value, read_tx_6, std::bind(&TxIndexImplTest::dummyCallback, this)).error_code());
+    ASSERT_EQ(v2.content(), read_value.content());
 }
 
 TEST_F(TxIndexImplTest, read_not_exist) {
-
-}
-
-TEST_F(TxIndexImplTest, read_deleted) {
-
+    azino::Value read_value;
+    ASSERT_EQ(azino::TxOpStatus_Code_ReadNotExist, ti->Read(k1, read_value, t1, std::bind(&TxIndexImplTest::dummyCallback, this)).error_code());
+    ASSERT_EQ(azino::TxOpStatus_Code_Ok, ti->WriteIntent(k1, v1, t1).error_code());
+    t1.set_commit_ts(4);
+    ASSERT_EQ(azino::TxOpStatus_Code_Ok, ti->Commit(k1, t1).error_code());
+    azino::TxIdentifier read_tx_3;
+    read_tx_3.set_start_ts(3);
+    ASSERT_EQ(azino::TxOpStatus_Code_ReadNotExist, ti->Read(k1, read_value, t1, std::bind(&TxIndexImplTest::dummyCallback, this)).error_code());
+    azino::TxIdentifier read_tx_6;
+    read_tx_6.set_start_ts(6);
+    ASSERT_EQ(azino::TxOpStatus_Code_Ok, ti->Read(k1, read_value, read_tx_6, std::bind(&TxIndexImplTest::dummyCallback, this)).error_code());
+    ASSERT_EQ(v1.content(), read_value.content());
 }
