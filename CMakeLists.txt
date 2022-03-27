@@ -108,9 +108,10 @@ add_subdirectory(third_party/googletest)
 
 # build every component
 add_subdirectory(storage)
-add_subdirectory(client)
 add_subdirectory(txindex)
 add_subdirectory(txplanner)
+add_subdirectory(sdk)
 
-# build brpc examples
+# build examples
 add_subdirectory(example/echo_c++)
+add_subdirectory(example/client)
