@@ -224,7 +224,7 @@ public:
                 bthread_t bid;
                 auto* arg = new std::function<void()>(func);
                 if (bthread_start_background(&bid, nullptr, CallbackWrapper, arg) != 0) {
-                    LOG(FATAL) << "Failed to start callback.";
+                    LOG(ERROR) << "Failed to start callback.";
                 }
             }
             iter->second.clear();
@@ -272,7 +272,7 @@ public:
                 bthread_t bid;
                 auto* arg = new std::function<void()>(func);
                 if (bthread_start_background(&bid, nullptr, CallbackWrapper, arg) != 0) {
-                    LOG(FATAL) << "Failed to start callback.";
+                    LOG(ERROR) << "Failed to start callback.";
                 }
             }
             iter->second.clear();

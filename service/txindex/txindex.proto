@@ -1,0 +1,63 @@
+syntax="proto2";
+package azino.txindex;
+
+option cc_generic_services = true;
+
+import "service/tx.proto";
+import "service/kv.proto";
+
+message WriteLockRequest {
+  optional azino.TxIdentifier txid = 1;
+  optional string key = 2;
+  optional azino.Value value = 3;
+}
+
+message WriteLockResponse {
+  optional azino.TxOpStatus tx_op_status = 1;
+}
+
+message WriteIntentRequest {
+  optional azino.TxIdentifier txid = 1;
+  optional string key = 2;
+  optional azino.Value value = 3;
+}
+
+message WriteIntentResponse {
+  optional azino.TxOpStatus tx_op_status = 1;
+}
+
+message CleanRequest {
+  optional azino.TxIdentifier txid = 1;
+  optional string key = 2;
+}
+
+message CleanResponse {
+  optional azino.TxOpStatus tx_op_status = 1;
+}
+
+message CommitRequest {
+  optional azino.TxIdentifier txid = 1;
+  optional string key = 2;
+}
+
+message CommitResponse {
+  optional azino.TxOpStatus tx_op_status = 1;
+}
+
+message ReadRequest {
+  optional azino.TxIdentifier txid = 1;
+  optional string key = 2;
+}
+
+message ReadResponse {
+  optional azino.TxOpStatus tx_op_status = 1;
+  optional azino.Value value = 2;
+}
+
+service TxOpService {
+  rpc WriteIntent(WriteIntentRequest) returns (WriteIntentResponse);
+  rpc WriteLock(WriteLockRequest) returns (WriteLockResponse);
+  rpc Clean(CleanRequest) returns (CleanResponse);
+  rpc Commit(CommitRequest) returns (CommitResponse);
+  rpc Read(ReadRequest) returns (ReadResponse);
+}

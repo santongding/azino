@@ -3,7 +3,7 @@ project(azino_txindex C CXX)
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
 add_library(${PROJECT_NAME} STATIC ${PROJECT_SOURCE_DIR}/simpletxindex/txindeximpl.cpp
-                                    )
+                                   ${PROJECT_SOURCE_DIR}/service/txopserviceimpl.cpp)
 add_library(azino_txindex::lib ALIAS ${PROJECT_NAME})
 
 add_executable(txindex_server ${PROJECT_SOURCE_DIR}/main.cpp)

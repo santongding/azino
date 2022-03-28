@@ -5,6 +5,8 @@
 #include "service/tx.pb.h"
 #include "service/kv.pb.h"
 
+#include <functional>
+
 namespace azino {
 namespace txindex {
     class TxIndex {

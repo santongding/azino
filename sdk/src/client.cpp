@@ -14,7 +14,7 @@ namespace azino {
         auto* channelOptions = new brpc::ChannelOptions();
 
         if (channel->Init(txplanner_addr.c_str(), channelOptions) != 0) {
-            LOG(FATAL) << "Fail to initialize channel";
+            LOG(ERROR) << "Fail to initialize channel";
         }
 
         _txplanner = std::make_pair(txplanner_addr, std::shared_ptr<brpc::Channel>(channel));
