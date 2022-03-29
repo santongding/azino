@@ -39,8 +39,8 @@ public:
        return std::make_pair(iter->first, iter->second.get());
     }
     TxIdentifier Holder() const { return _holder; }
-    Value* TmpValue() const {
-        return _tmp_value.get();
+    Value* IntentValue() const {
+        return _intent_value.get();
     }
     // finds greater or equal
     std::pair<TimeStamp, Value*> Seek(TimeStamp ts) {
@@ -55,7 +55,7 @@ private:
     friend class KVBucket;
     bool _has_lock;
     bool _has_intent;
-    std::unique_ptr<Value> _tmp_value;
+    std::unique_ptr<Value> _intent_value;
     TxIdentifier _holder;
     std::map<TimeStamp, std::unique_ptr<Value>, std::greater<TimeStamp>> _t2v;
 };
@@ -66,7 +66,7 @@ public:
     DISALLOW_COPY_AND_ASSIGN(KVBucket);
     ~KVBucket() = default;
 
-    virtual TxOpStatus WriteLock(const UserKey& key, const Value& v, const TxIdentifier& txid, std::function<void()> callback) override {
+    virtual TxOpStatus WriteLock(const UserKey& key, const TxIdentifier& txid, std::function<void()> callback) override {
         std::lock_guard<bthread::Mutex> lck(_latch);
 
         TxOpStatus sts;
@@ -92,7 +92,7 @@ public:
             if (txid.start_ts() != mv->Holder().start_ts()) {
                 ss << "Tx(" << txid.ShortDebugString() << ") write lock on " << "\"" << key  << "\"" << " blocked. "
                    << "Find " << (mv->HasLock() ? "lock" : "intent") << " Tx(" << mv->Holder().ShortDebugString() << ") value: "
-                   << mv->TmpValue()->ShortDebugString();
+                   << (mv->HasLock() ? "" : mv->IntentValue()->ShortDebugString());
                 sts.set_error_code(TxOpStatus_Code_WriteBlock);
                 sts.set_error_message(ss.str());
                 LOG(INFO) << ss.str();
@@ -104,16 +104,15 @@ public:
             }
             ss << "Tx(" << txid.ShortDebugString() << ") write lock on " << "\"" << key  << "\"" << " repeated. "
                << "Find "<< (mv->HasLock() ? "lock" : "intent") << " Tx(" << mv->Holder().ShortDebugString() << ") value: "
-               << mv->TmpValue()->ShortDebugString();
+               << (mv->HasLock() ? "" : mv->IntentValue()->ShortDebugString());
             sts.set_error_code(TxOpStatus_Code_Ok);
             sts.set_error_message(ss.str());
-            LOG(WARNING) << ss.str();
+            LOG(NOTICE) << ss.str();
             return sts;
         }
 
         mv->_has_lock = true;
         mv->_holder = txid;
-        mv->_tmp_value.reset(new Value(v));
         ss << "Tx(" << txid.ShortDebugString() << ") write lock on " << "\"" << key  << "\"" << " successes. ";
         sts.set_error_code(TxOpStatus_Code_Ok);
         sts.set_error_message(ss.str());
@@ -147,7 +146,7 @@ public:
             if (txid.start_ts() != mv->Holder().start_ts()) {
                 ss << "Tx(" << txid.ShortDebugString() << ") write intent on " << "\"" << key  << "\"" << " conflicts. "
                    << "Find " << (mv->HasLock() ? "lock" : "intent") << " Tx(" << mv->Holder().ShortDebugString() << ") value: "
-                   << mv->TmpValue()->ShortDebugString();
+                   << (mv->HasLock() ? "" : mv->IntentValue()->ShortDebugString());
                 sts.set_error_code(TxOpStatus_Code_WriteConflicts);
                 sts.set_error_message(ss.str());
                 LOG(INFO) << ss.str();
@@ -156,19 +155,19 @@ public:
             if (mv->HasIntent()) {
                 ss << "Tx(" << txid.ShortDebugString() << ") write intent on " << "\"" << key  << "\"" << " repeated. "
                    << "Find "<< "intent" << " Tx(" << mv->Holder().ShortDebugString() << ") value: "
-                   << mv->TmpValue()->ShortDebugString();
+                   << mv->IntentValue()->ShortDebugString();
                 sts.set_error_code(TxOpStatus_Code_Ok);
                 sts.set_error_message(ss.str());
-                LOG(WARNING) << ss.str();
+                LOG(NOTICE) << ss.str();
                 return sts;
             }
 
             mv->_has_lock = false;
             mv->_has_intent = true;
             mv->_holder = txid;
+            mv->_intent_value.reset(new Value(v));
             ss << "Tx(" << txid.ShortDebugString() << ") write intent on " << "\"" << key  << "\"" << " successes. "
-               << "Find "<< "lock" << " Tx(" << mv->Holder().ShortDebugString() << ") value: "
-               << mv->TmpValue()->ShortDebugString();
+               << "Find "<< "lock" << " Tx(" << mv->Holder().ShortDebugString() << ") value: ";
             sts.set_error_code(TxOpStatus_Code_Ok);
             sts.set_error_message(ss.str());
             LOG(INFO) << ss.str();
@@ -177,7 +176,7 @@ public:
 
         mv->_has_intent = true;
         mv->_holder = txid;
-        mv->_tmp_value.reset(new Value(v));
+        mv->_intent_value.reset(new Value(v));
         ss << "Tx(" << txid.ShortDebugString() << ") write intent on " << "\"" << key  << "\"" << " successes. ";
         sts.set_error_code(TxOpStatus_Code_Ok);
         sts.set_error_message(ss.str());
@@ -198,7 +197,7 @@ public:
             if (iter != _kvs.end()) {
                 assert(!(iter->second->HasIntent() && iter->second->HasLock()));
                 ss << "Find " << (iter->second->HasLock() ? "lock" : "intent") << " Tx(" << iter->second->Holder().ShortDebugString() << ") value: "
-                   << iter->second->TmpValue()->ShortDebugString();
+                   << (iter->second->HasLock() ? "" : iter->second->IntentValue()->ShortDebugString());
             }
             sts.set_error_code(TxOpStatus_Code_CleanNotExist);
             sts.set_error_message(ss.str());
@@ -208,13 +207,13 @@ public:
 
         ss << "Tx(" << txid.ShortDebugString() << ") clean on " << "\"" << key  << "\"" << " success. "
            << "Find "<< (iter->second->HasLock() ? "lock" : "intent") << " Tx(" << iter->second->Holder().ShortDebugString() << ") value: "
-           << iter->second->TmpValue()->ShortDebugString();
+           << (iter->second->HasLock() ? "" : iter->second->IntentValue()->ShortDebugString());
         sts.set_error_code(TxOpStatus_Code_Ok);
         sts.set_error_message(ss.str());
         LOG(INFO) << ss.str();
 
         iter->second->_holder.Clear();
-        iter->second->_tmp_value.reset(nullptr);
+        iter->second->_intent_value.reset(nullptr);
         iter->second->_has_intent = false;
         iter->second->_has_lock = false;
 
@@ -246,7 +245,7 @@ public:
             if (iter != _kvs.end()) {
                 assert(!(iter->second->HasIntent() && iter->second->HasLock()));
                 ss << "Find " << (iter->second->HasLock() ? "lock" : "intent") << " Tx(" << iter->second->Holder().ShortDebugString() << ") value: "
-                   << iter->second->TmpValue()->ShortDebugString();
+                   << (iter->second->HasLock() ? "" : iter->second->IntentValue()->ShortDebugString());
             }
             sts.set_error_code(TxOpStatus_Code_CommitNotExist);
             sts.set_error_message(ss.str());
@@ -256,13 +255,13 @@ public:
 
         ss << "Tx(" << txid.ShortDebugString() << ") commit on " << "\"" << key  << "\"" << " success. "
            << "Find "<< "intent" << " Tx(" << iter->second->Holder().ShortDebugString() << ") value: "
-           << iter->second->TmpValue()->ShortDebugString();
+           << iter->second->IntentValue()->ShortDebugString();
         sts.set_error_code(TxOpStatus_Code_Ok);
         sts.set_error_message(ss.str());
         LOG(INFO) << ss.str();
 
         iter->second->_holder.Clear();
-        iter->second->_t2v.insert(std::make_pair(txid.commit_ts(), std::move(iter->second->_tmp_value)));
+        iter->second->_t2v.insert(std::make_pair(txid.commit_ts(), std::move(iter->second->_intent_value)));
         iter->second->_has_intent = false;
         iter->second->_has_lock = false;
 
@@ -298,13 +297,12 @@ public:
         if ((iter->second->HasIntent() || iter->second->HasLock())
             && iter->second->Holder().start_ts() == txid.start_ts()) {
             assert(!(iter->second->HasIntent() && iter->second->HasLock()));
-            ss << "Tx(" << txid.ShortDebugString() << ") read on " << "\"" << key  << "\"" << " success. "
-               << "Find "<< (iter->second->HasLock() ? "lock" : "intent") << " Tx(" << iter->second->Holder().ShortDebugString() << ") value: "
-               << iter->second->TmpValue()->ShortDebugString();
-            sts.set_error_code(TxOpStatus_Code_Ok);
+            ss << "Tx(" << txid.ShortDebugString() << ") read on " << "\"" << key  << "\"" << " not exist. "
+               << "Find its own "<< (iter->second->HasLock() ? "lock" : "intent") << " Tx(" << iter->second->Holder().ShortDebugString() << ") value: "
+               << (iter->second->HasLock() ? "" : iter->second->IntentValue()->ShortDebugString());
+            sts.set_error_code(TxOpStatus_Code_ReadNotExist);
             sts.set_error_message(ss.str());
-            LOG(INFO) << ss.str();
-            v.CopyFrom(*(iter->second->TmpValue()));
+            LOG(ERROR) << ss.str();
             return sts;
         }
 
@@ -312,7 +310,7 @@ public:
             assert(!iter->second->HasLock());
             ss << "Tx(" << txid.ShortDebugString() << ") read on " << "\"" << key  << "\"" << " blocked. "
                << "Find "<< "intent" << " Tx(" << iter->second->Holder().ShortDebugString() << ") value: "
-               << iter->second->TmpValue()->ShortDebugString();
+               << iter->second->IntentValue()->ShortDebugString();
             sts.set_error_code(TxOpStatus_Code_ReadBlock);
             sts.set_error_message(ss.str());
             LOG(INFO) << ss.str();
@@ -357,9 +355,9 @@ public:
     DISALLOW_COPY_AND_ASSIGN(TxIndexImpl);
     ~TxIndexImpl() = default;
 
-    virtual TxOpStatus WriteLock(const UserKey& key, const Value& v, const TxIdentifier& txid, std::function<void()> callback) override {
+    virtual TxOpStatus WriteLock(const UserKey& key, const TxIdentifier& txid, std::function<void()> callback) override {
         auto bucket_num = butil::Hash(key) % FLAGS_latch_bucket_num;
-        return _kvbs[bucket_num]->WriteLock(key, v, txid, callback);
+        return _kvbs[bucket_num]->WriteLock(key, txid, callback);
     }
 
     virtual TxOpStatus WriteIntent(const UserKey& key, const Value& v, const TxIdentifier& txid) override {

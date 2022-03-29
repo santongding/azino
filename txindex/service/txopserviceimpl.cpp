@@ -34,10 +34,10 @@ namespace txindex {
 
         std::stringstream ss;
         ss << cntl->remote_side() << " tx: " << request->txid().ShortDebugString() << " is going to write lock"
-           << " key: " << request->key() << " value: " << request->value().ShortDebugString();
+           << " key: " << request->key();
         LOG(INFO) << ss.str();
 
-        TxOpStatus* sts = new TxOpStatus(_index->WriteLock(request->key(), request->value(), request->txid(),
+        TxOpStatus* sts = new TxOpStatus(_index->WriteLock(request->key(), request->txid(),
                                                            std::bind(&TxOpServiceImpl::WriteLock, this, controller, request, response, done)));
         if (sts->error_code() == TxOpStatus_Code_WriteBlock) {
             done_guard.release();

@@ -9,7 +9,6 @@ import "service/kv.proto";
 message WriteLockRequest {
   optional azino.TxIdentifier txid = 1;
   optional string key = 2;
-  optional azino.Value value = 3;
 }
 
 message WriteLockResponse {
