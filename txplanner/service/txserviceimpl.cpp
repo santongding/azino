@@ -43,7 +43,7 @@ namespace txplanner {
         auto txid = new TxIdentifier();
         txid->set_start_ts(start_ts);
         txid->set_allocated_status(txstatus);
-        ss << cntl->remote_side() << " tx: " << txid->ShortDebugString() << "is going to begin.";
+        ss << cntl->remote_side() << " tx: " << txid->ShortDebugString() << " is going to begin.";
         LOG(INFO) << ss.str();
         txstatus->set_status_message(ss.str());
         response->set_allocated_txid(txid);
@@ -72,7 +72,7 @@ namespace txplanner {
         txid->set_start_ts(request->txid().start_ts());
         txid->set_commit_ts(commit_ts);
         txid->set_allocated_status(txstatus);
-        ss << cntl->remote_side() << " tx: " << txid->ShortDebugString() << "is going to commit.";
+        ss << cntl->remote_side() << " tx: " << txid->ShortDebugString() << " is going to commit.";
         LOG(INFO) << ss.str();
         txstatus->set_status_message(ss.str());
         response->set_allocated_txid(txid);

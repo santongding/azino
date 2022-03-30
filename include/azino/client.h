@@ -13,21 +13,22 @@
 
 namespace brpc {
     class Channel;
+    class ChannelOptions;
 }
 
 namespace azino {
     class TxIdentifier;
-    class TxOpsLog;
+    class TxWriteBuffer;
 
     // not thread safe, and it is not reusable.
-    class Trasaction {
+    class Transaction {
     public:
-        Trasaction(const Options& options, const std::string& txplanner_addr);
-        DISALLOW_COPY_AND_ASSIGN(Trasaction);
-        ~Trasaction();
+        Transaction(const Options& options, const std::string& txplanner_addr);
+        DISALLOW_COPY_AND_ASSIGN(Transaction);
+        ~Transaction();
 
         // tx operations
-        Status Start();
+        Status Begin();
         Status Commit();
 
         // kv operations, fail when tx has not started
@@ -36,11 +37,12 @@ namespace azino {
         Status Delete(const WriteOptions& options, const UserKey& key);
         
     private:
+        std::unique_ptr<brpc::ChannelOptions> _channel_options;
         std::pair<std::string, std::shared_ptr<brpc::Channel>> _txplanner;
         std::pair<std::string, std::shared_ptr<brpc::Channel>> _storage;
         std::unordered_map<std::string, std::shared_ptr<brpc::Channel>> _txindexs;
         std::unique_ptr<TxIdentifier> _txid;
-        std::unique_ptr<TxOpsLog> _txopslog;
+        std::unique_ptr<TxWriteBuffer> _txwritebuffer;
     };
 
 
