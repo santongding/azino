@@ -10,8 +10,8 @@ add_executable(storage_server ${PROJECT_SOURCE_DIR}/main.cpp
                               )
 
 target_link_libraries(storage_server
-                        azino::lib
                         azino_storage::lib
+                        azino::lib
                         ${BRPC_LIB}
                         ${DYNAMIC_LIB})
 
@@ -21,8 +21,8 @@ enable_testing()
 add_executable(test_dbimpl  ${PROJECT_SOURCE_DIR}/test/test_dbimpl.cpp
                             )
 target_link_libraries(test_dbimpl
-                        azino::lib
                         azino_storage::lib
+                        azino::lib
                         gtest_main
                         ${BRPC_LIB}
                         ${DYNAMIC_LIB}
