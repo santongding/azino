@@ -8,7 +8,7 @@ include(FindProtobuf)
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
 # brpc
-set(BRPC_PATH "/incubator-brpc/output")
+set(BRPC_PATH "/home/os/incubator-brpc/output")
 message(STATUS "Set brpc path ${BRPC_PATH}")
 set(CMAKE_PREFIX_PATH ${BRPC_PATH})
 find_path(BRPC_INCLUDE_PATH NAMES brpc/server.h)

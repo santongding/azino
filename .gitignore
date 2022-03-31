@@ -2,3 +2,5 @@ build
 cmake-build-debug-
 *.pb.cc
 *.pb.h
+.idea
+cmake-build-debug
