@@ -40,7 +40,7 @@ namespace storage {
         virtual StorageStatus Get(const std::string& key,
                            std::string& value) = 0;
 
-        // If the database contains keys whose bitwise value are equal or less than "key", store the
+        // If the database contains keys whose bitwise value are equal or bigger than "key", store the
         // biggest key in *found_key and return OK.
         //
         // If there is no entry for "key" leave *found_key unchanged and return
