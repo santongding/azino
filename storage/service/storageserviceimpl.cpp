@@ -80,14 +80,25 @@ namespace storage {
                 LOG(INFO) << cntl->remote_side() << " Success to delete key: " << request->key();
             }
     }
+    const static char format_key[]="MVCCKEY_%s";
+    const static char format_ts[]="_%016lx_%c";
 
-    static std::string convert(std::string key,::google::protobuf::uint64 ts,bool is_delete){
+    static std::string convert(const std::string key,::google::protobuf::uint64 ts,bool is_delete){
 
-        const static char format []="MVCCKEY_%s_TS_%016lx_%c";
-        static auto format_len = strlen(format);
+        static auto format = std::string(format_key)+std::string(format_ts);
+
+        char *buffer=new char[key.length()+format.length()];
+        sprintf(buffer,format.c_str(),key.data(),~ts,is_delete?'1':'0');
+        auto ans = std::string(buffer);
+        delete[]buffer;
+
+        return ans;
+    }
+    static std::string convertPrefix(const std::string key){
+        static auto format_len = strlen(format_key);
 
         char *buffer=new char[key.length()+format_len];
-        sprintf(buffer,format,key.data(),ts,is_delete?'1':'0');
+        sprintf(buffer,format_key,key.data());
         auto ans = std::string(buffer);
         delete[]buffer;
 
@@ -120,7 +131,55 @@ namespace storage {
     void StorageServiceImpl::MVCCGet(::google::protobuf::RpcController *controller,
                                      const ::azino::storage::MVCCGetRequest *request,
                                      ::azino::storage::MVCCGetResponse *response, ::google::protobuf::Closure *done) {
-        StorageService::MVCCGet(controller, request, response, done);
+        brpc::Controller *cntl = static_cast<brpc::Controller *>(controller);
+
+        auto real_key = convert(request->key(),request->ts(), false);
+
+        std::string found_key;
+        StorageStatus ss = _storage->Seek(request->key(),found_key);
+        if (ss.error_code() != StorageStatus::Ok) {
+            StorageStatus* ssts = new StorageStatus(ss);
+            response->set_allocated_status(ssts);
+            LOG(WARNING) << cntl->remote_side() << " Fail to seek key: " << request->key()
+                         << " ts: "<<request->ts()
+                         << " error code: " << ss.error_code()
+                         << " error message: " << ss.error_message();
+        } else {
+
+            auto prefix = convertPrefix(request->key());
+            if(found_key.compare(0, prefix.length(),prefix)||found_key[found_key.length()-1]!='0'){
+                StorageStatus *ssts = new StorageStatus();
+                ssts->set_error_code(StorageStatus::NotFound);
+                if(found_key[found_key.length()-1]!='0'){
+                    ssts->set_error_message("key deleted");
+                }else{
+                    ssts->set_error_message("prefix not match");
+                }
+                response->set_allocated_status(ssts);
+                LOG(WARNING) << cntl->remote_side() << " seeked wrong key: " << request->key()
+                             << " ts: "<<request->ts()
+                             << " seeked key "<<found_key
+                             << " error code: " << ss.error_code()
+                             << " error message: " << ss.error_message();
+                return ;
+            }
+
+            std::string value;
+            ss = _storage->Get(found_key, value);
+            if (ss.error_code() != StorageStatus::Ok) {
+                StorageStatus* ssts = new StorageStatus(ss);
+                response->set_allocated_status(ssts);
+                LOG(WARNING) << cntl->remote_side() << " Fail to get seeked key: " << found_key
+                             << " mvcc key: " << real_key
+                             << " error code: " << ss.error_code()
+                             << " error message: " << ss.error_message();
+            } else {
+                LOG(INFO) << cntl->remote_side() << " Success to get seeked key: " << found_key
+                          << " value: " << value;
+                response->set_value(value);
+            }
+
+        }
     }
 
     void StorageServiceImpl::MVCCDelete(::google::protobuf::RpcController *controller,
@@ -136,12 +195,12 @@ namespace storage {
         if (ss.error_code() != StorageStatus::Ok) {
             StorageStatus* ssts = new StorageStatus(ss);
             response->set_allocated_status(ssts);
-            LOG(WARNING) << cntl->remote_side() << " Fail to delete key: " << request->key()
+            LOG(WARNING) << cntl->remote_side() << " Fail to delete mvcc key: " << request->key()
                          << " ts: "<<request->ts()
                          << " error code: " << ss.error_code()
                          << " error message: " << ss.error_message();
         } else {
-            LOG(INFO) << cntl->remote_side() << " Success to delete key: " << request->key()
+            LOG(INFO) << cntl->remote_side() << " Success to delete mvcc key: " << request->key()
                       << " real_key: "<<real_key;
         }
     }

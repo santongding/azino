@@ -39,6 +39,16 @@ namespace storage {
         // May return some other Status on an error.
         virtual StorageStatus Get(const std::string& key,
                            std::string& value) = 0;
+
+        // If the database contains keys whose bitwise value are equal or less than "key", store the
+        // biggest key in *found_key and return OK.
+        //
+        // If there is no entry for "key" leave *found_key unchanged and return
+        // a status for which Status::IsNotFound() returns true.
+        //
+        // May return some other Status on an error.
+        virtual StorageStatus Seek(const std::string &key,std::string &found_key) = 0;
+
     };
 
 } // namespace storage

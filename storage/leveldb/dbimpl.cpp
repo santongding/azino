@@ -87,6 +87,24 @@ namespace {
             return LevelDBStatus(leveldbstatus);
         }
 
+
+        virtual StorageStatus Seek(const std::string &key,std::string &found_key)override {
+            if (_leveldbptr == nullptr) {
+                StorageStatus ss;
+                ss.set_error_code(StorageStatus::InvalidArgument);
+                ss.set_error_message("Already opened an leveldb");
+                return ss;
+            }
+            leveldb::ReadOptions opt;
+            opt.verify_checksums = true;
+            std::unique_ptr<leveldb::Iterator> iter(_leveldbptr->NewIterator(opt));
+            iter->Seek(key);
+            if(iter->Valid()){
+                found_key = iter->key().ToString();
+            }else{
+                return LevelDBStatus(iter->status());
+            }
+        }
     private:
         std::unique_ptr<leveldb::DB> _leveldbptr;
     };
