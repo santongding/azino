@@ -101,8 +101,13 @@ namespace {
             iter->Seek(key);
             if(iter->Valid()){
                 found_key = iter->key().ToString();
+                StorageStatus ss;
+                return ss;
             }else{
-                return LevelDBStatus(iter->status());
+                StorageStatus ss;
+                ss.set_error_code(StorageStatus::NotFound);
+                ss.set_error_message(iter->status().ToString());
+                return ss;
             }
         }
     private:

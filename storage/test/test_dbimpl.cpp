@@ -21,6 +21,19 @@ protected:
 };
 
 TEST_F(DBImplTest, crud) {
+    std::string seeked_key;
+
+    ASSERT_TRUE(storage->Seek("seek",seeked_key).error_code()==azino::storage::StorageStatus_Code_NotFound);
+    ASSERT_TRUE(storage->Put("seek1", "world").error_code() == azino::storage::StorageStatus_Code_Ok);
+    ASSERT_TRUE(storage->Seek("seek",seeked_key).error_code()==azino::storage::StorageStatus_Code_Ok);
+    ASSERT_EQ(seeked_key,"seek1");
+    ASSERT_TRUE(storage->Put("seek", "world").error_code() == azino::storage::StorageStatus_Code_Ok);
+    ASSERT_TRUE(storage->Seek("seek",seeked_key).error_code()==azino::storage::StorageStatus_Code_Ok);
+    ASSERT_EQ(seeked_key,"seek");
+    ASSERT_EQ(azino::storage::StorageStatus_Code_Ok, storage->Delete("seek").error_code());
+    ASSERT_EQ(azino::storage::StorageStatus_Code_Ok, storage->Delete("seek1").error_code());
+    ASSERT_TRUE(storage->Seek("seek",seeked_key).error_code()==azino::storage::StorageStatus_Code_NotFound);
+
     ASSERT_TRUE(storage->Put("hello", "world").error_code() == azino::storage::StorageStatus_Code_Ok);
     std::string s;
     ASSERT_EQ(azino::storage::StorageStatus_Code_Ok, storage->Get("hello", s).error_code());
