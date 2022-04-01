@@ -87,7 +87,7 @@ namespace storage {
 
         static auto format = std::string(format_key)+std::string(format_ts);
 
-        char *buffer=new char[key.length()+format.length()];
+        char *buffer=new char[key.length()+format.length()+16];
         sprintf(buffer,format.c_str(),key.data(),~ts,is_delete?'1':'0');//need to inverse timestamp because leveldb's seek find the bigger one
         auto ans = std::string(buffer);
         delete[]buffer;
