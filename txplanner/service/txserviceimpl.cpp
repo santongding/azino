@@ -66,7 +66,7 @@ namespace txplanner {
 
         std::stringstream ss;
         auto txstatus = new TxStatus();
-        txstatus->set_status_code(TxStatus_Code_Committing);
+        txstatus->set_status_code(TxStatus_Code_Preputting);
         auto commit_ts = _timer->NewTime();
         auto txid = new TxIdentifier();
         txid->set_start_ts(request->txid().start_ts());

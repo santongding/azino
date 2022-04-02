@@ -20,10 +20,12 @@ message TxStatus {
   enum Code {
    UnInitialize = 0;
    Started = 1;
-   Committing = 2;
-   Committed = 3;
-   Aborting = 4;
-   Aborted = 5;
+   Preputting = 2;
+   Committing = 3;
+   Committed = 4;
+   Aborting = 5;
+   Aborted = 6;
+   Abnormal = 7;
   };
   optional Code status_code = 1 [default = UnInitialize];
   optional string status_message = 2;
