@@ -17,8 +17,8 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
       _channel_options(new brpc::ChannelOptions),
       _txid(nullptr),
       _txwritebuffer(new TxWriteBuffer) {
-        _channel_options->timeout_ms = FLAGS_max_retry;
-        _channel_options->max_retry = FLAGS_timeout_ms;
+        _channel_options->timeout_ms = FLAGS_timeout_ms;
+        _channel_options->max_retry = FLAGS_max_retry;
 
         auto* channel = new brpc::Channel();
         if (channel->Init(txplanner_addr.c_str(), _channel_options.get()) != 0) {
@@ -45,10 +45,10 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
             LOG(WARNING) << ss.str();
             return Status::NetworkErr(ss.str());
         }
-        ss << "sdk: " << cntl.local_side() << " BeginTx from txplanner: " << cntl.remote_side()
-           << " request: " << req.ShortDebugString()
-           << " response: " << resp.ShortDebugString()
-           << " latency=" << cntl.latency_us() << "us";
+        ss << "sdk: " << cntl.local_side() << " BeginTx from txplanner: " << cntl.remote_side() << std::endl
+           << "request: " << req.ShortDebugString() << std::endl
+           << "response: " << resp.ShortDebugString() << std::endl
+           << "latency=" << cntl.latency_us() << "us";
         if (!resp.has_storage_addr() || resp.txindex_addrs_size() == 0) {
             ss << " fail. ";
             LOG(WARNING) << ss.str();
@@ -99,10 +99,10 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
             LOG(WARNING) << ss.str();
             return Status::NetworkErr(ss.str());
         }
-        ss << "sdk: " << cntl.local_side() << " CommitTx from txplanner: " << cntl.remote_side()
-           << " request: " << req.ShortDebugString()
-           << " response: " << resp.ShortDebugString()
-           << " latency=" << cntl.latency_us() << "us";
+        ss << "sdk: " << cntl.local_side() << " CommitTx from txplanner: " << cntl.remote_side() << std::endl
+           << "request: " << req.ShortDebugString() << std::endl
+           << "response: " << resp.ShortDebugString() << std::endl
+           << "latency=" << cntl.latency_us() << "us";
         ss << " success. ";
         LOG(INFO) << ss.str();
 
@@ -113,26 +113,28 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
         Status preput_sts = PreputAll();
         if (preput_sts.IsOk()) {
             txid_sts->set_status_code(TxStatus_Code_Committing);
-            txid_sts->set_status_message(preput_sts.ToString());
             Status commit_sts = CommitAll();
             if (commit_sts.IsOk()) {
                 txid_sts->set_status_code(TxStatus_Code_Committed);
+                txid_sts->set_status_message(commit_sts.ToString());
+                return commit_sts;
             } else {
                 txid_sts->set_status_code(TxStatus_Code_Abnormal);
+                txid_sts->set_status_message(commit_sts.ToString());
+                return commit_sts;
             }
-            txid_sts->set_status_message(commit_sts.ToString());
-            return commit_sts;
         } else {
             txid_sts->set_status_code(TxStatus_Code_Aborting);
-            txid_sts->set_status_message(preput_sts.ToString());
             Status abort_sts =  AbortAll();
             if (abort_sts.IsOk()) {
                 txid_sts->set_status_code(TxStatus_Code_Aborted);
+                txid_sts->set_status_message(preput_sts.ToString());
+                return preput_sts;
             } else {
                 txid_sts->set_status_code(TxStatus_Code_Abnormal);
+                txid_sts->set_status_message(abort_sts.ToString());
+                return abort_sts;
             }
-            txid_sts->set_status_message(abort_sts.ToString());
-            return abort_sts;
         }
     }
 
@@ -141,7 +143,7 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
         std::stringstream ss;
         for (auto iter = _txwritebuffer->begin(); iter != _txwritebuffer->end(); iter++) {
             assert(!iter->second.preput);
-            ss.clear();
+            ss = std::stringstream();
             auto txindex_num = butil::Hash(iter->first) % _txindexs.size();
             azino::txindex::TxOpService_Stub stub(_txindexs[txindex_num].second.get());
             brpc::Controller cntl;
@@ -157,10 +159,10 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
                 req.release_value();
                 return Status::NetworkErr(ss.str());
             }
-            ss << "sdk: " << cntl.local_side() << " WriteIntent from txindex: " << cntl.remote_side()
-               << " request: " << req.ShortDebugString()
-               << " response: " << resp.ShortDebugString()
-               << " latency=" << cntl.latency_us() << "us";
+            ss << "sdk: " << cntl.local_side() << " WriteIntent from txindex: " << cntl.remote_side() << std::endl
+               << "request: " << req.ShortDebugString() << std::endl
+               << "response: " << resp.ShortDebugString() << std::endl
+               << "latency=" << cntl.latency_us() << "us";
             req.release_value();
             switch (resp.tx_op_status().error_code()) {
                 case TxOpStatus_Code_Ok:
@@ -188,7 +190,7 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
 
         for (auto iter = _txwritebuffer->begin(); iter != _txwritebuffer->end(); iter++) {
             assert(iter->second.preput);
-            ss.clear();
+            ss = std::stringstream();
             auto txindex_num = butil::Hash(iter->first) % _txindexs.size();
             azino::txindex::TxOpService_Stub stub(_txindexs[txindex_num].second.get());
             brpc::Controller cntl;
@@ -202,10 +204,10 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
                 LOG(WARNING) << ss.str();
                 return Status::NetworkErr(ss.str());
             }
-            ss << "sdk: " << cntl.local_side() << " Commit from txindex: " << cntl.remote_side()
-               << " request: " << req.ShortDebugString()
-               << " response: " << resp.ShortDebugString()
-               << " latency=" << cntl.latency_us() << "us";
+            ss << "sdk: " << cntl.local_side() << " Commit from txindex: " << cntl.remote_side() << std::endl
+               << "request: " << req.ShortDebugString() << std::endl
+               << "response: " << resp.ShortDebugString() << std::endl
+               << "latency=" << cntl.latency_us() << "us";
             switch (resp.tx_op_status().error_code()) {
                 case TxOpStatus_Code_Ok:
                     ss << " success. ";
@@ -225,8 +227,8 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
         std::stringstream ss;
 
         for (auto iter = _txwritebuffer->begin(); iter != _txwritebuffer->end(); iter++) {
-            if (!iter->second.preput) continue;
-            ss.clear();
+            if (!iter->second.preput && iter->second.options.type == kOptimistic) continue;
+            ss = std::stringstream();
             auto txindex_num = butil::Hash(iter->first) % _txindexs.size();
             azino::txindex::TxOpService_Stub stub(_txindexs[txindex_num].second.get());
             brpc::Controller cntl;
@@ -240,10 +242,10 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
                 LOG(WARNING) << ss.str();
                 return Status::NetworkErr(ss.str());
             }
-            ss << "sdk: " << cntl.local_side() << " Clean from txindex: " << cntl.remote_side()
-               << " request: " << req.ShortDebugString()
-               << " response: " << resp.ShortDebugString()
-               << " latency=" << cntl.latency_us() << "us";
+            ss << "sdk: " << cntl.local_side() << " Clean from txindex: " << cntl.remote_side() << std::endl
+               << "request: " << req.ShortDebugString() << std::endl
+               << "response: " << resp.ShortDebugString() << std::endl
+               << "latency=" << cntl.latency_us() << "us";
             switch (resp.tx_op_status().error_code()) {
                 case TxOpStatus_Code_Ok:
                     ss << " success. ";
@@ -307,10 +309,10 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
                 LOG(WARNING) << ss.str();
                 return Status::NetworkErr(ss.str());
             }
-            ss << "sdk: " << cntl.local_side() << " WriteLock from txindex: " << cntl.remote_side()
-               << " request: " << req.ShortDebugString()
-               << " response: " << resp.ShortDebugString()
-               << " latency=" << cntl.latency_us() << "us";
+            ss << "sdk: " << cntl.local_side() << " WriteLock from txindex: " << cntl.remote_side() << std::endl
+               << "request: " << req.ShortDebugString() << std::endl
+               << "response: " << resp.ShortDebugString() << std::endl
+               << "latency=" << cntl.latency_us() << "us";
             switch (resp.tx_op_status().error_code()) {
                 case TxOpStatus_Code_Ok:
                     ss << " success. ";
@@ -359,10 +361,10 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
             LOG(WARNING) << ss.str();
             return Status::NetworkErr(ss.str());
         }
-        ss << "sdk: " << cntl.local_side() << " Read from txindex: " << cntl.remote_side()
-           << " request: " << req.ShortDebugString()
-           << " response: " << resp.ShortDebugString()
-           << " latency=" << cntl.latency_us() << "us";
+        ss << "sdk: " << cntl.local_side() << " Read from txindex: " << cntl.remote_side() << std::endl
+           << "request: " << req.ShortDebugString() << std::endl
+           << "response: " << resp.ShortDebugString() << std::endl
+           << "latency=" << cntl.latency_us() << "us";
         switch (resp.tx_op_status().error_code()) {
             case TxOpStatus_Code_Ok:
                 ss << " success. ";

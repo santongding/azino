@@ -45,7 +45,6 @@ namespace txplanner {
         txid->set_allocated_status(txstatus);
         ss << cntl->remote_side() << " tx: " << txid->ShortDebugString() << " is going to begin.";
         LOG(INFO) << ss.str();
-        txstatus->set_status_message(ss.str());
         response->set_allocated_txid(txid);
         for (std::string& addr : _txindex_addrs) {
             response->add_txindex_addrs(addr);
@@ -74,7 +73,6 @@ namespace txplanner {
         txid->set_allocated_status(txstatus);
         ss << cntl->remote_side() << " tx: " << txid->ShortDebugString() << " is going to commit.";
         LOG(INFO) << ss.str();
-        txstatus->set_status_message(ss.str());
         response->set_allocated_txid(txid);
     }
 }

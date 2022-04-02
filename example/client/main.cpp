@@ -22,7 +22,7 @@ int main(int argc, char* argv[]) {
             } else if (action == "commit") {
                 auto sts = tx.Commit();
                 std::cout << sts.ToString() << std::endl;
-                if (sts.IsOk()) break;
+                break;
             } else if (action == "pput") {
                 std::cin >> key >> value;
                 azino::WriteOptions opts;
