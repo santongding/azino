@@ -3,7 +3,7 @@
 //
 
 #ifndef AZINO_STORAGE_INCLUDE_UTILS_H
-#define AZINO_UTILS_H
+#define AZINO_STORAGE_INCLUDE_UTILS_H
 #include "storage.h"
 #include "service/storage/storage.pb.h"
 namespace azino {
@@ -34,4 +34,4 @@ namespace azino {
         }
     }
 }
-#endif //AZINO_UTILS_H
+#endif //AZINO_STORAGE_INCLUDE_UTILS_H
