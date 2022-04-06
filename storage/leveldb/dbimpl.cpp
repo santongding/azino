@@ -101,13 +101,17 @@ namespace {
             iter->Seek(key);
             if(iter->Valid()){
                 found_key = iter->key().ToString();
-                StorageStatus ss;
-                return ss;
-            }else{
-                StorageStatus ss;
-                ss.set_error_code(StorageStatus::NotFound);
-                ss.set_error_message(iter->status().ToString());
-                return ss;
+                return LevelDBStatus(leveldb::Status::OK());
+            }else {
+                //StorageStatus ss;
+                //ss.set_error_code(StorageStatus::NotFound);
+                //ss.set_error_message(iter->status().ToString());
+
+                if (iter->status().ok()) {
+                    return LevelDBStatus(leveldb::Status::NotFound("iter status: " + iter->status().ToString()));
+                } else{
+                    return LevelDBStatus(iter->status());
+                }
             }
         }
     private:
