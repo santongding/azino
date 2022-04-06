@@ -2,7 +2,7 @@
 // Created by os on 4/6/22.
 //
 
-#ifndef AZINO_UTILS_H
+#ifndef AZINO_STORAGE_INCLUDE_UTILS_H
 #define AZINO_UTILS_H
 #include "storage.h"
 #include "service/storage/storage.pb.h"
