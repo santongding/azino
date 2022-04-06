@@ -23,11 +23,19 @@ protected:
 
 TEST_F(DBImplTest, crud) {
 
+    std::string seeked_key;
+
     ASSERT_EQ(azino::storage::convertPrefix("test"),"MVCCKEY_test");
     ASSERT_EQ(azino::storage::convert("test",0,0),"MVCCKEY_test_ffffffffffffffff_0");
     ASSERT_EQ(azino::storage::convert("",~0,1),"MVCCKEY__0000000000000000_1");
 
-    std::string seeked_key;
+    auto mvcc_key = azino::storage::convert("mvcc",233,0);
+    ASSERT_TRUE(storage->Put(mvcc_key, "world").error_code() == azino::storage::StorageStatus_Code_Ok);
+    ASSERT_TRUE(storage->Seek(azino::storage::convert("mvcc",234,0),seeked_key).error_code()==azino::storage::StorageStatus_Code_Ok);
+    ASSERT_EQ(seeked_key, mvcc_key);
+
+
+
     ASSERT_TRUE(storage->Seek("seek",seeked_key).error_code()==azino::storage::StorageStatus_Code_NotFound);
     ASSERT_TRUE(storage->Put("seek1", "world").error_code() == azino::storage::StorageStatus_Code_Ok);
     ASSERT_TRUE(storage->Seek("seek",seeked_key).error_code()==azino::storage::StorageStatus_Code_Ok);

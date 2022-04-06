@@ -89,9 +89,9 @@ namespace storage {
         brpc::ClosureGuard done_guard(done);
         brpc::Controller *cntl = static_cast<brpc::Controller *>(controller);
 
-        auto real_key = convert(request->key(),request->ts(), false);
+        auto internal_key = convert(request->key(), request->ts(), false);
 
-        StorageStatus ss = _storage->Put(real_key, request->value());
+        StorageStatus ss = _storage->Put(internal_key, request->value());
         if (ss.error_code() != StorageStatus::Ok) {
             StorageStatus *ssts = new StorageStatus(ss);
             response->set_allocated_status(ssts);
@@ -101,7 +101,7 @@ namespace storage {
                          << " value: " << request->value() << " error message: " << ss.error_message();
         } else {
             LOG(INFO) << cntl->remote_side() << " Success to put key: " << request->key()
-                      <<" real key: "<<real_key
+                      << " internal key: " << internal_key
                       << " value: " << request->value();
         }
     }
@@ -111,10 +111,10 @@ namespace storage {
                                      ::azino::storage::MVCCGetResponse *response, ::google::protobuf::Closure *done) {
         brpc::Controller *cntl = static_cast<brpc::Controller *>(controller);
 
-        auto real_key = convert(request->key(),request->ts(), false);
+        auto internal_key = convert(request->key(), request->ts(), false);
 
         std::string found_key;
-        StorageStatus ss = _storage->Seek(request->key(),found_key);
+        StorageStatus ss = _storage->Seek(internal_key,found_key);
         if (ss.error_code() != StorageStatus::Ok) {
             StorageStatus* ssts = new StorageStatus(ss);
             response->set_allocated_status(ssts);
@@ -148,7 +148,7 @@ namespace storage {
                 StorageStatus* ssts = new StorageStatus(ss);
                 response->set_allocated_status(ssts);
                 LOG(WARNING) << cntl->remote_side() << " Fail to get seeked key: " << found_key
-                             << " mvcc key: " << real_key
+                             << " mvcc key: " << internal_key
                              << " error code: " << ss.error_code()
                              << " error message: " << ss.error_message();
             } else {
@@ -167,7 +167,7 @@ namespace storage {
         brpc::ClosureGuard done_guard(done);
         brpc::Controller* cntl = static_cast<brpc::Controller*>(controller);
 
-        auto real_key = convert(request->key(),request->ts(), true);
+        auto internal_key = convert(request->key(), request->ts(), true);
 
         StorageStatus ss = _storage->Put(request->key(),"");
         if (ss.error_code() != StorageStatus::Ok) {
@@ -179,7 +179,7 @@ namespace storage {
                          << " error message: " << ss.error_message();
         } else {
             LOG(INFO) << cntl->remote_side() << " Success to delete mvcc key: " << request->key()
-                      << " real_key: "<<real_key;
+                      << " internal_key: " << internal_key;
         }
     }
 
