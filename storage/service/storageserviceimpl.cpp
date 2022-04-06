@@ -109,6 +109,7 @@ namespace storage {
     void StorageServiceImpl::MVCCGet(::google::protobuf::RpcController *controller,
                                      const ::azino::storage::MVCCGetRequest *request,
                                      ::azino::storage::MVCCGetResponse *response, ::google::protobuf::Closure *done) {
+        brpc::ClosureGuard done_guard(done);
         brpc::Controller *cntl = static_cast<brpc::Controller *>(controller);
 
         auto internal_key = convert(request->key(), request->ts(), false);
