@@ -32,17 +32,17 @@ TEST_F(DBImplTest, crud) {
     auto mvcc_key = azino::storage::convert("mvcc",233,0);
     ASSERT_TRUE(storage->Put(mvcc_key, "world").error_code() == azino::storage::StorageStatus_Code_Ok);
     ASSERT_TRUE(storage->Seek(azino::storage::convert("mvcc",234,0),seeked_key).error_code()==azino::storage::StorageStatus_Code_Ok);
-    ASSERT_EQ(seeked_key, mvcc_key);
+    ASSERT_EQ(seeked_key, "world");
 
 
 
     ASSERT_TRUE(storage->Seek("seek",seeked_key).error_code()==azino::storage::StorageStatus_Code_NotFound);
-    ASSERT_TRUE(storage->Put("seek1", "world").error_code() == azino::storage::StorageStatus_Code_Ok);
+    ASSERT_TRUE(storage->Put("seek1", "world1").error_code() == azino::storage::StorageStatus_Code_Ok);
     ASSERT_TRUE(storage->Seek("seek",seeked_key).error_code()==azino::storage::StorageStatus_Code_Ok);
-    ASSERT_EQ(seeked_key,"seek1");
+    ASSERT_EQ(seeked_key,"world1");
     ASSERT_TRUE(storage->Put("seek", "world").error_code() == azino::storage::StorageStatus_Code_Ok);
     ASSERT_TRUE(storage->Seek("seek",seeked_key).error_code()==azino::storage::StorageStatus_Code_Ok);
-    ASSERT_EQ(seeked_key,"seek");
+    ASSERT_EQ(seeked_key,"world");
     ASSERT_EQ(azino::storage::StorageStatus_Code_Ok, storage->Delete("seek").error_code());
     ASSERT_EQ(azino::storage::StorageStatus_Code_Ok, storage->Delete("seek1").error_code());
     ASSERT_TRUE(storage->Seek("seek",seeked_key).error_code()==azino::storage::StorageStatus_Code_NotFound);

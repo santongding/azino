@@ -88,7 +88,7 @@ namespace {
         }
 
 
-        virtual StorageStatus Seek(const std::string &key,std::string &found_key)override {
+        virtual StorageStatus Seek(const std::string &key,std::string &value)override {
             if (_leveldbptr == nullptr) {
                 StorageStatus ss;
                 ss.set_error_code(StorageStatus::InvalidArgument);
@@ -100,7 +100,7 @@ namespace {
             std::unique_ptr<leveldb::Iterator> iter(_leveldbptr->NewIterator(opt));
             iter->Seek(key);
             if(iter->Valid()){
-                found_key = iter->key().ToString();
+                value = iter->value().data();
                 return LevelDBStatus(leveldb::Status::OK());
             }else {
                 //StorageStatus ss;
