@@ -3,6 +3,7 @@
 #include <string>
 
 #include "storage.h"
+#include "utils.h"
 
 azino::storage::Storage* storage;
 
@@ -21,8 +22,12 @@ protected:
 };
 
 TEST_F(DBImplTest, crud) {
-    std::string seeked_key;
 
+    ASSERT_EQ(azino::storage::convertPrefix("test"),"MVCCKEY_test");
+    ASSERT_EQ(azino::storage::convert("test",0,0),"MVCCKEY_test_ffffffffffffffff_0");
+    ASSERT_EQ(azino::storage::convert("",~0,1),"MVCCKEY__0000000000000000_1");
+
+    std::string seeked_key;
     ASSERT_TRUE(storage->Seek("seek",seeked_key).error_code()==azino::storage::StorageStatus_Code_NotFound);
     ASSERT_TRUE(storage->Put("seek1", "world").error_code() == azino::storage::StorageStatus_Code_Ok);
     ASSERT_TRUE(storage->Seek("seek",seeked_key).error_code()==azino::storage::StorageStatus_Code_Ok);
