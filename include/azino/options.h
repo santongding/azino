@@ -10,8 +10,14 @@ namespace azino {
 
     };
 
-    struct WriteOptions {
+    enum WriteType {
+        kAutomatic = 0,
+        kOptimistic = 1,
+        kPessimistic = 2
+    };
 
+    struct WriteOptions {
+        WriteType type = kAutomatic;
     };
     
 }
