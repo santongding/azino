@@ -81,5 +81,71 @@ namespace storage {
             }
     }
 
+
+    void StorageServiceImpl::MVCCPut(::google::protobuf::RpcController *controller,
+                                     const ::azino::storage::MVCCPutRequest *request,
+                                     ::azino::storage::MVCCPutResponse *response, ::google::protobuf::Closure *done) {
+        brpc::ClosureGuard done_guard(done);
+        brpc::Controller *cntl = static_cast<brpc::Controller *>(controller);
+
+        StorageStatus ss = _storage->MVCCPut(request->key(),request->ts(), request->value());
+        if (ss.error_code() != StorageStatus::Ok) {
+            StorageStatus *ssts = new StorageStatus(ss);
+            response->set_allocated_status(ssts);
+            LOG(WARNING) << cntl->remote_side() << " Fail to put mvcc key: " << request->key()
+                         <<" ts: "<<request->ts()
+                         << " error code: " << ss.error_code()
+                         << " value: " << request->value() << " error message: " << ss.error_message();
+        } else {
+            LOG(INFO) << cntl->remote_side() << " Success to put mvcc key: " << request->key()
+                      <<" ts: "<<request->ts()
+                      << " value: " << request->value();
+        }
+    }
+
+    void StorageServiceImpl::MVCCGet(::google::protobuf::RpcController *controller,
+                                     const ::azino::storage::MVCCGetRequest *request,
+                                     ::azino::storage::MVCCGetResponse *response, ::google::protobuf::Closure *done) {
+        brpc::ClosureGuard done_guard(done);
+        brpc::Controller *cntl = static_cast<brpc::Controller *>(controller);
+
+        std::string value;
+        StorageStatus ss = _storage->MVCCGet(request->key(), request->ts(),value);
+        if (ss.error_code() != StorageStatus::Ok) {
+            StorageStatus* ssts = new StorageStatus(ss);
+            response->set_allocated_status(ssts);
+            LOG(WARNING) << cntl->remote_side() << " Fail to get mvcc key: " << request->key()
+                         << " ts: "<<request->ts()
+                         << " error code: " << ss.error_code()
+                         << " error message: " << ss.error_message();
+        } else {
+            LOG(INFO) << cntl->remote_side() << " Success to get mvcc key: " << request->key()
+                      <<" ts: "<<request->ts()
+                      << " value: " << value;
+            response->set_value(value);
+        }
+    }
+
+    void StorageServiceImpl::MVCCDelete(::google::protobuf::RpcController *controller,
+                                        const ::azino::storage::MVCCDeleteRequest *request,
+                                        ::azino::storage::MVCCDeleteResponse *response,
+                                        ::google::protobuf::Closure *done){
+        brpc::ClosureGuard done_guard(done);
+        brpc::Controller* cntl = static_cast<brpc::Controller*>(controller);
+
+        StorageStatus ss = _storage->MVCCDelete(request->key(),request->ts());
+        if (ss.error_code() != StorageStatus::Ok) {
+            StorageStatus* ssts = new StorageStatus(ss);
+            response->set_allocated_status(ssts);
+            LOG(WARNING) << cntl->remote_side() << " Fail to delete mvcc key: " << request->key()
+                         << " ts: "<<request->ts()
+                         << " error code: " << ss.error_code()
+                         << " error message: " << ss.error_message();
+        } else {
+            LOG(INFO) << cntl->remote_side() << " Success to delete mvcc key: " << request->key()
+                      <<" ts: "<<request->ts();
+        }
+    }
+
 } // namespace storage
 } // namespace azino
