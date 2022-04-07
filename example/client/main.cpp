@@ -22,16 +22,40 @@ int main(int argc, char* argv[]) {
             } else if (action == "commit") {
                 auto sts = tx.Commit();
                 std::cout << sts.ToString() << std::endl;
-                if (sts.IsOk()) break;
-            } else if (action == "put") {
+                break;
+            } else if (action == "pput") {
                 std::cin >> key >> value;
+                azino::WriteOptions opts;
+                opts.type = azino::kPessimistic;
+                auto sts = tx.Put(opts, key, value);
+                std::cout << sts.ToString() << std::endl;
+            } else if (action == "oput") {
+                std::cin >> key >> value;
+                azino::WriteOptions opts;
+                opts.type = azino::kOptimistic;
+                auto sts = tx.Put(opts, key, value);
+                std::cout << sts.ToString() << std::endl;
             } else if (action == "get") {
                 std::cin >> key;
-            } else if (action == "delete") {
+                azino::ReadOptions opts;
+                auto sts = tx.Get(opts, key, value);
+                std::cout << sts.ToString() << std::endl;
+                std::cout << value << std::endl;
+            } else if (action == "pdelete") {
                 std::cin >> key;
-            } else {
+                azino::WriteOptions opts;
+                opts.type = azino::kPessimistic;
+                auto sts = tx.Delete(opts, key);
+                std::cout << sts.ToString() << std::endl;
+            } else if (action == "odelete") {
+                std::cin >> key;
+                azino::WriteOptions opts;
+                opts.type = azino::kOptimistic;
+                auto sts = tx.Delete(opts, key);
+                std::cout << sts.ToString() << std::endl;
+            }  else {
                 std::getline(std::cin, action);
-                std::cout << "Use put, get or delete" << std::endl;
+                std::cout << "Use pput, oput, get or pdelete, odelete" << std::endl;
                 continue;
             }
         }

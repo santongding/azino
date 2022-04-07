@@ -78,7 +78,7 @@ public:
         auto ltv = mv->LargestTSValue();
 
         if (ltv.first >= txid.start_ts()) {
-            ss << "Tx(" << txid.ShortDebugString() << ") write lock on " << "\"" << key  << "\"" << " too late. "
+            ss << "Tx(" << txid.ShortDebugString() << ") write lock on " << "key: "<< key << " too late. "
                << "Find " << "largest ts: " << ltv.first << " value: "
                << ltv.second->ShortDebugString();
             sts.set_error_code(TxOpStatus_Code_WriteTooLate);
@@ -90,7 +90,7 @@ public:
         if (mv->HasIntent() || mv->HasLock()) {
             assert(!(mv->HasIntent() && mv->HasLock()));
             if (txid.start_ts() != mv->Holder().start_ts()) {
-                ss << "Tx(" << txid.ShortDebugString() << ") write lock on " << "\"" << key  << "\"" << " blocked. "
+                ss << "Tx(" << txid.ShortDebugString() << ") write lock on " << "key: "<< key << " blocked. "
                    << "Find " << (mv->HasLock() ? "lock" : "intent") << " Tx(" << mv->Holder().ShortDebugString() << ") value: "
                    << (mv->HasLock() ? "" : mv->IntentValue()->ShortDebugString());
                 sts.set_error_code(TxOpStatus_Code_WriteBlock);
@@ -102,7 +102,7 @@ public:
                 _blocked_ops[key].push_back(callback);
                 return sts;
             }
-            ss << "Tx(" << txid.ShortDebugString() << ") write lock on " << "\"" << key  << "\"" << " repeated. "
+            ss << "Tx(" << txid.ShortDebugString() << ") write lock on " << "key: "<< key << " repeated. "
                << "Find "<< (mv->HasLock() ? "lock" : "intent") << " Tx(" << mv->Holder().ShortDebugString() << ") value: "
                << (mv->HasLock() ? "" : mv->IntentValue()->ShortDebugString());
             sts.set_error_code(TxOpStatus_Code_Ok);
@@ -113,7 +113,7 @@ public:
 
         mv->_has_lock = true;
         mv->_holder = txid;
-        ss << "Tx(" << txid.ShortDebugString() << ") write lock on " << "\"" << key  << "\"" << " successes. ";
+        ss << "Tx(" << txid.ShortDebugString() << ") write lock on " << "key: "<< key << " successes. ";
         sts.set_error_code(TxOpStatus_Code_Ok);
         sts.set_error_message(ss.str());
         LOG(INFO) << ss.str();
@@ -132,7 +132,7 @@ public:
         auto ltv = mv->LargestTSValue();
 
         if (ltv.first >= txid.start_ts()) {
-            ss << "Tx(" << txid.ShortDebugString() << ") write intent on " << "\"" << key  << "\"" << " too late. "
+            ss << "Tx(" << txid.ShortDebugString() << ") write intent on " << "key: "<< key << " too late. "
                << "Find " << "largest ts: " << ltv.first << " value: "
                << ltv.second->ShortDebugString();
             sts.set_error_code(TxOpStatus_Code_WriteTooLate);
@@ -144,7 +144,7 @@ public:
         if (mv->HasIntent() || mv->HasLock()) {
             assert(!(mv->HasIntent() && mv->HasLock()));
             if (txid.start_ts() != mv->Holder().start_ts()) {
-                ss << "Tx(" << txid.ShortDebugString() << ") write intent on " << "\"" << key  << "\"" << " conflicts. "
+                ss << "Tx(" << txid.ShortDebugString() << ") write intent on " << "key: "<< key << " conflicts. "
                    << "Find " << (mv->HasLock() ? "lock" : "intent") << " Tx(" << mv->Holder().ShortDebugString() << ") value: "
                    << (mv->HasLock() ? "" : mv->IntentValue()->ShortDebugString());
                 sts.set_error_code(TxOpStatus_Code_WriteConflicts);
@@ -153,7 +153,7 @@ public:
                 return sts;
             }
             if (mv->HasIntent()) {
-                ss << "Tx(" << txid.ShortDebugString() << ") write intent on " << "\"" << key  << "\"" << " repeated. "
+                ss << "Tx(" << txid.ShortDebugString() << ") write intent on " << "key: "<< key << " repeated. "
                    << "Find "<< "intent" << " Tx(" << mv->Holder().ShortDebugString() << ") value: "
                    << mv->IntentValue()->ShortDebugString();
                 sts.set_error_code(TxOpStatus_Code_Ok);
@@ -166,7 +166,7 @@ public:
             mv->_has_intent = true;
             mv->_holder = txid;
             mv->_intent_value.reset(new Value(v));
-            ss << "Tx(" << txid.ShortDebugString() << ") write intent on " << "\"" << key  << "\"" << " successes. "
+            ss << "Tx(" << txid.ShortDebugString() << ") write intent on " << "key: "<< key << " successes. "
                << "Find "<< "lock" << " Tx(" << mv->Holder().ShortDebugString() << ") value: ";
             sts.set_error_code(TxOpStatus_Code_Ok);
             sts.set_error_message(ss.str());
@@ -177,7 +177,7 @@ public:
         mv->_has_intent = true;
         mv->_holder = txid;
         mv->_intent_value.reset(new Value(v));
-        ss << "Tx(" << txid.ShortDebugString() << ") write intent on " << "\"" << key  << "\"" << " successes. ";
+        ss << "Tx(" << txid.ShortDebugString() << ") write intent on " << "key: "<< key << " successes. ";
         sts.set_error_code(TxOpStatus_Code_Ok);
         sts.set_error_message(ss.str());
         LOG(INFO) << ss.str();
@@ -193,7 +193,7 @@ public:
         if (iter == _kvs.end()
             || (!iter->second->HasLock() && !iter->second->HasIntent())
             || iter->second->Holder().start_ts() != txid.start_ts()) {
-            ss << "Tx(" << txid.ShortDebugString() << ") clean on " << "\"" << key  << "\"" << " not exist. ";
+            ss << "Tx(" << txid.ShortDebugString() << ") clean on " << "key: "<< key << " not exist. ";
             if (iter != _kvs.end()) {
                 assert(!(iter->second->HasIntent() && iter->second->HasLock()));
                 ss << "Find " << (iter->second->HasLock() ? "lock" : "intent") << " Tx(" << iter->second->Holder().ShortDebugString() << ") value: "
@@ -205,7 +205,7 @@ public:
             return sts;
         }
 
-        ss << "Tx(" << txid.ShortDebugString() << ") clean on " << "\"" << key  << "\"" << " success. "
+        ss << "Tx(" << txid.ShortDebugString() << ") clean on " << "key: "<< key << " success. "
            << "Find "<< (iter->second->HasLock() ? "lock" : "intent") << " Tx(" << iter->second->Holder().ShortDebugString() << ") value: "
            << (iter->second->HasLock() ? "" : iter->second->IntentValue()->ShortDebugString());
         sts.set_error_code(TxOpStatus_Code_Ok);
@@ -241,7 +241,7 @@ public:
         if (iter == _kvs.end()
             || !iter->second->HasIntent()
             || iter->second->Holder().start_ts() != txid.start_ts()) {
-            ss << "Tx(" << txid.ShortDebugString() << ") commit on " << "\"" << key  << "\"" << " not exist. ";
+            ss << "Tx(" << txid.ShortDebugString() << ") commit on " << "key: "<< key << " not exist. ";
             if (iter != _kvs.end()) {
                 assert(!(iter->second->HasIntent() && iter->second->HasLock()));
                 ss << "Find " << (iter->second->HasLock() ? "lock" : "intent") << " Tx(" << iter->second->Holder().ShortDebugString() << ") value: "
@@ -253,7 +253,7 @@ public:
             return sts;
         }
 
-        ss << "Tx(" << txid.ShortDebugString() << ") commit on " << "\"" << key  << "\"" << " success. "
+        ss << "Tx(" << txid.ShortDebugString() << ") commit on " << "key: "<< key << " success. "
            << "Find "<< "intent" << " Tx(" << iter->second->Holder().ShortDebugString() << ") value: "
            << iter->second->IntentValue()->ShortDebugString();
         sts.set_error_code(TxOpStatus_Code_Ok);
@@ -287,7 +287,7 @@ public:
         std::stringstream ss;
         auto iter = _kvs.find(key);
         if (iter == _kvs.end()) {
-            ss << "Tx(" << txid.ShortDebugString() << ") read on " << "\"" << key  << "\"" << " not exist. ";
+            ss << "Tx(" << txid.ShortDebugString() << ") read on " << "key: "<< key << " not exist. ";
             sts.set_error_code(TxOpStatus_Code_ReadNotExist);
             sts.set_error_message(ss.str());
             LOG(INFO) << ss.str();
@@ -297,7 +297,7 @@ public:
         if ((iter->second->HasIntent() || iter->second->HasLock())
             && iter->second->Holder().start_ts() == txid.start_ts()) {
             assert(!(iter->second->HasIntent() && iter->second->HasLock()));
-            ss << "Tx(" << txid.ShortDebugString() << ") read on " << "\"" << key  << "\"" << " not exist. "
+            ss << "Tx(" << txid.ShortDebugString() << ") read on " << "key: "<< key << " not exist. "
                << "Find its own "<< (iter->second->HasLock() ? "lock" : "intent") << " Tx(" << iter->second->Holder().ShortDebugString() << ") value: "
                << (iter->second->HasLock() ? "" : iter->second->IntentValue()->ShortDebugString());
             sts.set_error_code(TxOpStatus_Code_ReadNotExist);
@@ -308,7 +308,7 @@ public:
 
         if (iter->second->HasIntent() && iter->second->Holder().start_ts() < txid.start_ts()) {
             assert(!iter->second->HasLock());
-            ss << "Tx(" << txid.ShortDebugString() << ") read on " << "\"" << key  << "\"" << " blocked. "
+            ss << "Tx(" << txid.ShortDebugString() << ") read on " << "key: "<< key << " blocked. "
                << "Find "<< "intent" << " Tx(" << iter->second->Holder().ShortDebugString() << ") value: "
                << iter->second->IntentValue()->ShortDebugString();
             sts.set_error_code(TxOpStatus_Code_ReadBlock);
@@ -323,7 +323,7 @@ public:
 
         auto sv = iter->second->Seek(txid.start_ts());
         if (sv.first <= txid.start_ts()) {
-            ss << "Tx(" << txid.ShortDebugString() << ") read on " << "\"" << key  << "\"" << " success. "
+            ss << "Tx(" << txid.ShortDebugString() << ") read on " << "key: "<< key << " success. "
                << "Find " << "ts: " << sv.first << " value: "
                << sv.second->ShortDebugString();
             sts.set_error_code(TxOpStatus_Code_Ok);
@@ -333,7 +333,7 @@ public:
             return sts;
         }
 
-        ss << "Tx(" << txid.ShortDebugString() << ") read on " << "\"" << key  << "\"" << " not exist. ";
+        ss << "Tx(" << txid.ShortDebugString() << ") read on " << "key: "<< key << " not exist. ";
         sts.set_error_code(TxOpStatus_Code_ReadNotExist);
         sts.set_error_message(ss.str());
         LOG(INFO) << ss.str();

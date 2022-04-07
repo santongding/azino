@@ -20,6 +20,9 @@ namespace azino {
         Status static IllegalTxOp(const std::string& s = "") {
             return Status(kIllegalTxOp, s);
         }
+        Status static TxIndexErr(const std::string& s = "") {
+            return Status(kTxIndexErr, s);
+        }
         Status static NotSupportedErr(const std::string& s = "") {
             return Status(kNotSupportedErr, s);
         }
@@ -34,6 +37,9 @@ namespace azino {
         }
         bool IsIllegalTxOp() {
             return  _error_code == kIllegalTxOp;
+        }
+        bool IsTxIndexErr() {
+            return  _error_code == kTxIndexErr;
         }
         bool IsNotSupportedErr() {
             return _error_code == kNotSupportedErr;
@@ -54,6 +60,9 @@ namespace azino {
                 case kIllegalTxOp:
                     code_message = "IllegalTxOp. ";
                     break;
+                case kTxIndexErr:
+                    code_message = "TxIndexErr. ";
+                    break;
                 case kNotSupportedErr:
                     code_message = "NotSupportedError. ";
                     break;
@@ -67,7 +76,8 @@ namespace azino {
             kNotFound = 1,
             kNetworkErr = 2,
             kIllegalTxOp = 3,
-            kNotSupportedErr = 4
+            kTxIndexErr = 4,
+            kNotSupportedErr = 5
         };
         Status(Code c, const std::string& s)
         : _error_code(c),
