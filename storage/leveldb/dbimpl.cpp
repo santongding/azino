@@ -153,7 +153,7 @@ namespace {
             if (ss.error_code() != StorageStatus::Ok) {
                 return ss;
             } else {
-                auto state = MvccUtils::GetKeyState(key,found_key);
+                auto state = MvccUtils::GetKeyState(internal_key,found_key);
                 if(state == MvccUtils::OK){
                     value = found_value;
                     return ss;

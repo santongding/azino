@@ -25,15 +25,20 @@ TEST_F(DBImplTest, crud) {
 
     std::string seeked_key,seeked_value;
 
-    ASSERT_EQ(azino::storage::convertPrefix("test"),"MVCCKEY_test");
-    ASSERT_EQ(azino::storage::convert("test",0,0),"MVCCKEY_test_ffffffffffffffff_0");
-    ASSERT_EQ(azino::storage::convert("",~0,1),"MVCCKEY__0000000000000000_1");
+    ASSERT_TRUE(storage->MVCCGet("mvcc",0,seeked_value).error_code()==azino::storage::StorageStatus_Code_NotFound);
+    ASSERT_TRUE(storage->MVCCPut("mvcc",5,"123").error_code()==azino::storage::StorageStatus_Code_Ok);
+    ASSERT_TRUE(storage->MVCCGet("mvcc",0,seeked_value).error_code()==azino::storage::StorageStatus_Code_NotFound);
+    ASSERT_TRUE(storage->MVCCGet("mv",10,seeked_value).error_code()==azino::storage::StorageStatus_Code_NotFound);
+    ASSERT_TRUE(storage->MVCCGet("mvcd",10,seeked_value).error_code()==azino::storage::StorageStatus_Code_NotFound);
+    ASSERT_TRUE(storage->MVCCGet("mvca",10,seeked_value).error_code()==azino::storage::StorageStatus_Code_NotFound);
+    ASSERT_TRUE(storage->MVCCGet("mvcc",10,seeked_value).error_code()==azino::storage::StorageStatus_Code_Ok);
+    ASSERT_EQ(seeked_value,"123");
+    ASSERT_TRUE(storage->MVCCPut("mvcc",15,"1234").error_code()==azino::storage::StorageStatus_Code_Ok);
+    ASSERT_TRUE(storage->MVCCDelete("mvcc",20).error_code()==azino::storage::StorageStatus_Code_Ok);
+    ASSERT_TRUE(storage->MVCCGet("mvcc",25,seeked_value).error_code()==azino::storage::StorageStatus_Code_NotFound);
+    ASSERT_TRUE(storage->MVCCGet("mvcc",18,seeked_value).error_code()==azino::storage::StorageStatus_Code_Ok);
+    ASSERT_EQ(seeked_value,"1234");
 
-    auto mvcc_key = azino::storage::convert("mvcc",233,0);
-    ASSERT_TRUE(storage->Put(mvcc_key, "world").error_code() == azino::storage::StorageStatus_Code_Ok);
-    ASSERT_TRUE(storage->Seek(azino::storage::convert("mvcc",234,0),seeked_key,seeked_value).error_code()==azino::storage::StorageStatus_Code_Ok);
-    ASSERT_EQ(seeked_key, mvcc_key);
-    ASSERT_EQ(seeked_value, "world");
 
 
 
