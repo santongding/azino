@@ -1,0 +1,49 @@
+name: ci
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name:  >-
+      CI
+      ${{ matrix.os }}
+      ${{ matrix.compiler }}
+      ${{ matrix.build_tool}}
+      unittest ${{ matrix.with_test }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc]
+        os: [ubuntu-18.04]
+        build_tool: [cmake]
+        with_test: [false, true]
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
+    - name: Install dependencies on Linux
+      if: ${{ runner.os == 'Linux' }}
+      run: |
+        sudo apt-get install -qq libgflags-dev \
+            libprotobuf-dev libprotoc-dev protobuf-compiler \
+            libleveldb-dev libgoogle-perftools-dev
+    - name: Build with cmake
+      if: ${{ matrix.build_tool == 'cmake' }}
+      working-directory: ${{ github.workspace }}
+      run: |
+        sh build.sh
+    - name: Run Tests
+      if: ${{ matrix.with_test }}
+      id: test-azino
+      working-directory: ${{ github.workspace }}/output/test
+      run: |
+        ulimit -c unlimited -S
+        sh run_all_tests.sh
+    - name: Collect failure info
+      if: ${{ steps.test-azino.conclusion == 'failure'}}
+      run: |
+        COREFILE=$(find . -maxdepth 1 -name "core*" | head -n 1)
+        gdb -c "$COREFILE" example -ex "thread apply all bt" -ex "set pagination 0" -batch
