@@ -14,9 +14,9 @@ protected:
         storage->Open("TestDB");
     }
     void TearDown() {
+        delete storage;
         leveldb::Options opt;
         leveldb::DestroyDB("TestDB", opt);
-        delete storage;
     }
 };
 
