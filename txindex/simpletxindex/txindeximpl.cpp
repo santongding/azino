@@ -385,7 +385,7 @@ public:
     }
 
 private:
-    std::vector<std::shared_ptr<KVBucket>> _kvbs;
+    std::vector<std::unique_ptr<KVBucket>> _kvbs;
 };
 
 } // namespace

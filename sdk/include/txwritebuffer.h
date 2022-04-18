@@ -27,6 +27,8 @@ namespace azino {
                _m.insert(std::make_pair(key, TxWrite()));
            }
            _m[key].value.reset(value);
+           // if op1 write key1 pessimistic, then op2 write key1 optimistic
+           // key1 is still write pessimistic
            _m[key].options.type = std::max(_m[key].options.type, options.type);
        }
 

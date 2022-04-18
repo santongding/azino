@@ -12,6 +12,9 @@ namespace azino {
 DEFINE_int32(timeout_ms, -1, "RPC timeout in milliseconds");
 DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
 
+    Transaction::Channel::Channel() : Channel("", nullptr) {}
+    Transaction::Channel::Channel(const std::string &s, brpc::Channel *c) : _serverAddr(s), _brpcChannel(c) {}
+
     Transaction::Transaction(const Options& options, const std::string& txplanner_addr)
     : _options(new Options(options)),
       _channel_options(new brpc::ChannelOptions),
@@ -24,7 +27,7 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
         if (channel->Init(txplanner_addr.c_str(), _channel_options.get()) != 0) {
             LOG(ERROR) << "Fail to initialize channel: " << txplanner_addr;
         }
-        _txplanner = std::make_pair(txplanner_addr, std::shared_ptr<brpc::Channel>(channel));
+        _txplanner = Channel(txplanner_addr, channel);
     }
 
     Transaction::~Transaction() = default;
@@ -35,7 +38,7 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
             ss << "Transaction has already began. " << _txid->ShortDebugString();
             return Status::IllegalTxOp(ss.str());
         }
-        azino::txplanner::TxService_Stub stub(_txplanner.second.get());
+        azino::txplanner::TxService_Stub stub(_txplanner.get());
         brpc::Controller cntl;
         azino::txplanner::BeginTxRequest req;
         azino::txplanner::BeginTxResponse resp;
@@ -64,14 +67,14 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
         if (channel->Init(resp.storage_addr().c_str(), _channel_options.get()) != 0) {
             LOG(ERROR) << "Fail to initialize channel: " << resp.storage_addr();
         }
-        _storage = std::make_pair(resp.storage_addr(), std::shared_ptr<brpc::Channel>(channel));
+        _storage = Channel(resp.storage_addr(), channel);
 
         for (int i = 0; i < resp.txindex_addrs_size(); i++) {
             auto* txindex_channel = new brpc::Channel();
             if (txindex_channel->Init(resp.txindex_addrs(i).c_str(), _channel_options.get()) != 0) {
                 LOG(ERROR) << "Fail to initialize channel: " << resp.txindex_addrs(i);
             }
-            _txindexs.emplace_back(resp.txindex_addrs(i), std::shared_ptr<brpc::Channel>(txindex_channel));
+            _txindexs.emplace_back(resp.txindex_addrs(i), txindex_channel);
         }
 
         return Status::Ok(ss.str());
@@ -88,7 +91,7 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
             return Status::IllegalTxOp(ss.str());
         }
 
-        azino::txplanner::TxService_Stub stub(_txplanner.second.get());
+        azino::txplanner::TxService_Stub stub(_txplanner.get());
         brpc::Controller cntl;
         azino::txplanner::CommitTxRequest req;
         req.set_allocated_txid(new TxIdentifier(*_txid));
@@ -145,7 +148,7 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
             assert(!iter->second.preput);
             ss = std::stringstream();
             auto txindex_num = butil::Hash(iter->first) % _txindexs.size();
-            azino::txindex::TxOpService_Stub stub(_txindexs[txindex_num].second.get());
+            azino::txindex::TxOpService_Stub stub(_txindexs[txindex_num].get());
             brpc::Controller cntl;
             azino::txindex::WriteIntentRequest req;
             req.set_allocated_txid(new TxIdentifier(*_txid));
@@ -192,7 +195,7 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
             assert(iter->second.preput);
             ss = std::stringstream();
             auto txindex_num = butil::Hash(iter->first) % _txindexs.size();
-            azino::txindex::TxOpService_Stub stub(_txindexs[txindex_num].second.get());
+            azino::txindex::TxOpService_Stub stub(_txindexs[txindex_num].get());
             brpc::Controller cntl;
             azino::txindex::CommitRequest req;
             req.set_allocated_txid(new TxIdentifier(*_txid));
@@ -230,7 +233,7 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
             if (!iter->second.preput && iter->second.options.type == kOptimistic) continue;
             ss = std::stringstream();
             auto txindex_num = butil::Hash(iter->first) % _txindexs.size();
-            azino::txindex::TxOpService_Stub stub(_txindexs[txindex_num].second.get());
+            azino::txindex::TxOpService_Stub stub(_txindexs[txindex_num].get());
             brpc::Controller cntl;
             azino::txindex::CleanRequest req;
             req.set_allocated_txid(new TxIdentifier(*_txid));
@@ -297,7 +300,7 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
             && (_txwritebuffer->find(key) == _txwritebuffer->end()
                 || _txwritebuffer->find(key)->second.options.type != kPessimistic)) { // Pessimistic
             auto txindex_num = butil::Hash(key) % _txindexs.size();
-            azino::txindex::TxOpService_Stub stub(_txindexs[txindex_num].second.get());
+            azino::txindex::TxOpService_Stub stub(_txindexs[txindex_num].get());
             brpc::Controller cntl;
             azino::txindex::WriteLockRequest req;
             req.set_key(key);
@@ -349,7 +352,7 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
             }
         }
         auto txindex_num = butil::Hash(key) % _txindexs.size();
-        azino::txindex::TxOpService_Stub stub(_txindexs[txindex_num].second.get());
+        azino::txindex::TxOpService_Stub stub(_txindexs[txindex_num].get());
         brpc::Controller cntl;
         azino::txindex::ReadRequest req;
         req.set_key(key);
