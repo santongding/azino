@@ -1,5 +1,7 @@
 #include <leveldb/db.h>
+#include <leveldb/write_batch.h>
 #include <memory>
+#include "azino/kv.h"
 
 #include "storage.h"
 #include "utils.h"
@@ -9,7 +11,7 @@ namespace storage {
 namespace {
 
     StorageStatus LevelDBStatus(const leveldb::Status &lss);
-    
+
     class LevelDBImpl : public Storage {
     public:
         LevelDBImpl() : _leveldbptr(nullptr) {}
@@ -50,6 +52,27 @@ namespace {
             return LevelDBStatus(leveldbstatus);
         }
 
+
+        virtual StorageStatus BatchStore(const std::vector<Data> &datas)  override {
+            if (_leveldbptr == nullptr) {
+                StorageStatus ss;
+                ss.set_error_code(StorageStatus::InvalidArgument);
+                ss.set_error_message("Already opened an leveldb");
+                return ss;
+            }
+            leveldb::WriteOptions opts;
+            opts.sync = true;
+            leveldb::Status leveldbstatus;
+            leveldb::WriteBatch batch;
+
+            for (auto &data : datas) {
+                InternalKey key(*data.key, data.ts, data.is_delete);
+                batch.Put(key.Encode(), *data.value);
+            }
+            leveldbstatus = _leveldbptr->Write(opts, &batch);
+            return LevelDBStatus(leveldbstatus);
+
+        }
         // Remove the database entry (if any) for "key".  Returns OK on
         // success, and a non-OK status on error.  It is not an error if "key"
         // did not exist in the database.
