@@ -147,5 +147,31 @@ namespace storage {
         }
     }
 
+    void StorageServiceImpl::BatchStore(::google::protobuf::RpcController* controller,
+                                const ::azino::storage::BatchStoreRequest* request,
+                                ::azino::storage::BatchStoreResponse* response,
+                                ::google::protobuf::Closure* done) {
+
+        brpc::ClosureGuard done_guard(done);
+        brpc::Controller *cntl = static_cast<brpc::Controller *>(controller);
+
+        std::vector<Storage::Data>datas;
+        datas.reserve(request->datas_size());
+        for (auto &d: request->datas()) {
+            datas.push_back({&d.key(), &d.value().content(), d.ts(), d.value().is_delete()});
+        }
+        StorageStatus ss = _storage->BatchStore(datas);
+        if (ss.error_code() != StorageStatus::Ok) {
+            StorageStatus *ssts = new StorageStatus(ss);
+            response->set_allocated_status(ssts);
+            LOG(WARNING) << cntl->remote_side() << " Fail to batch store mvcc data. "
+                         << " error code: " << ss.error_code()
+                         << " data size: " << request->datas().size() << " error message: " << ss.error_message();
+        } else {
+            LOG(INFO) << cntl->remote_side() << " Success to batch store mvcc data. "
+                      << " data size: " << request->datas().size();
+        }
+    }
+
 } // namespace storage
 } // namespace azino

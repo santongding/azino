@@ -5,6 +5,7 @@
 #include <butil/macros.h>
 
 #include "azino/kv.h"
+#include "service/kv.pb.h"
 #include "service/storage/storage.pb.h"
 #include "utils.h"
 
@@ -51,9 +52,18 @@ namespace storage {
         // May return some other Status on an error.
         virtual StorageStatus Seek(const std::string &key,std::string &found_key,std::string &value) = 0;
 
-
+        struct Data {
+            const std::string *key;
+            const std::string *value;
+            TimeStamp ts;
+            bool is_delete;
+        };
+        // Add a series of database entries for "key" to "value" with timestamp "ts" and tag "is_delete".  Returns OK on success,
+        // and a non-OK status on error.
+        virtual StorageStatus BatchStore(const std::vector<Data> &datas) =0;
         // Add a database entry for "key" to "value" with timestamp "ts".  Returns OK on success,
         // and a non-OK status on error.
+
         virtual StorageStatus MVCCPut(const std::string &key, TimeStamp ts, const std::string& value) {
             auto internal_key = InternalKey(key, ts, false);
             StorageStatus ss = Put(internal_key.Encode(), value);
