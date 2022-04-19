@@ -264,7 +264,7 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
         return Status::Ok(); // todo: add some error message
     }
 
-    Status Transaction::Put(const WriteOptions& options, const UserKey& key, const std::string& value) {
+    Status Transaction::Put(const WriteOptions& options, const UserKey& key, const UserValue& value) {
         return Write(options, key, false, value);
     }
 
@@ -272,7 +272,7 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
         return Write(options, key, true);
     }
 
-    Status Transaction::Write(const WriteOptions& options, const UserKey& key, bool is_delete, const std::string& value) {
+    Status Transaction::Write(const WriteOptions& options, const UserKey& key, bool is_delete, const UserValue& value) {
         std::stringstream ss;
         if (!_txid) {
             ss << "Transaction has not began. ";
@@ -338,7 +338,7 @@ DEFINE_int32(max_retry, 2, "Max retries(not including the first RPC)");
         return Status::Ok(ss.str());
     }
 
-    Status Transaction::Get(const ReadOptions& options, const UserKey& key, std::string& value) {
+    Status Transaction::Get(const ReadOptions& options, const UserKey& key, UserValue& value) {
         std::stringstream ss;
         auto iter = _txwritebuffer->find(key);
         if (iter != _txwritebuffer->end()) {

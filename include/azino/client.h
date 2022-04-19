@@ -32,8 +32,8 @@ namespace azino {
         Status Commit();
 
         // kv operations, fail when tx has not started
-        Status Put(const WriteOptions& options, const UserKey& key, const std::string& value);
-        Status Get(const ReadOptions& options, const UserKey& key, std::string& value);
+        Status Put(const WriteOptions& options, const UserKey& key, const UserValue& value);
+        Status Get(const ReadOptions& options, const UserKey& key, UserValue& value);
         Status Delete(const WriteOptions& options, const UserKey& key);
         
     private:
@@ -48,7 +48,7 @@ namespace azino {
             std::unique_ptr<brpc::Channel> _brpcChannel;
         };
 
-        Status Write(const WriteOptions& options, const UserKey& key, bool is_delete, const std::string& value = "");
+        Status Write(const WriteOptions& options, const UserKey& key, bool is_delete, const UserValue& value = "");
         Status PreputAll();
         Status CommitAll();
         Status AbortAll();

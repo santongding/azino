@@ -42,7 +42,7 @@ public:
     Value* IntentValue() const {
         return _intent_value.get();
     }
-    // finds greater or equal
+    // Finds committed values whose timestamp is smaller or equal than "ts"
     std::pair<TimeStamp, Value*> Seek(TimeStamp ts) {
         auto iter = _t2v.lower_bound(ts);
         if (iter == _t2v.end()) {
@@ -66,7 +66,7 @@ public:
     DISALLOW_COPY_AND_ASSIGN(KVBucket);
     ~KVBucket() = default;
 
-    virtual TxOpStatus WriteLock(const UserKey& key, const TxIdentifier& txid, std::function<void()> callback) override {
+    virtual TxOpStatus WriteLock(const std::string& key, const TxIdentifier& txid, std::function<void()> callback) override {
         std::lock_guard<bthread::Mutex> lck(_latch);
 
         TxOpStatus sts;
@@ -120,7 +120,7 @@ public:
         return sts;
     }
 
-    virtual TxOpStatus WriteIntent(const UserKey& key, const Value& v, const TxIdentifier& txid) override {
+    virtual TxOpStatus WriteIntent(const std::string& key, const Value& v, const TxIdentifier& txid) override {
         std::lock_guard<bthread::Mutex> lck(_latch);
 
         TxOpStatus sts;
@@ -184,7 +184,7 @@ public:
         return sts;
     }
 
-    virtual TxOpStatus Clean(const UserKey& key, const TxIdentifier& txid) override {
+    virtual TxOpStatus Clean(const std::string& key, const TxIdentifier& txid) override {
         std::lock_guard<bthread::Mutex> lck(_latch);
 
         TxOpStatus sts;
@@ -232,7 +232,7 @@ public:
         return sts;
     }
 
-    virtual TxOpStatus Commit(const UserKey& key, const TxIdentifier& txid) override {
+    virtual TxOpStatus Commit(const std::string& key, const TxIdentifier& txid) override {
         std::lock_guard<bthread::Mutex> lck(_latch);
 
         TxOpStatus sts;
@@ -280,7 +280,7 @@ public:
         return sts;
     }
 
-    virtual TxOpStatus Read(const UserKey& key, Value& v, const TxIdentifier& txid, std::function<void()> callback) override {
+    virtual TxOpStatus Read(const std::string& key, Value& v, const TxIdentifier& txid, std::function<void()> callback) override {
         std::lock_guard<bthread::Mutex> lck(_latch);
 
         TxOpStatus sts;
@@ -341,10 +341,10 @@ public:
     }
 
 private:
-    /*butil::FlatMap<UserKey, std::unique_ptr<MVCCValue>> _kvs;
-    butil::FlatMap<UserKey, std::vector<std::function<void()>>> _blocked_ops;*/
-    std::unordered_map<UserKey, std::unique_ptr<MVCCValue>> _kvs;
-    std::unordered_map<UserKey, std::vector<std::function<void()>>> _blocked_ops;
+    /*butil::FlatMap<std::string, std::unique_ptr<MVCCValue>> _kvs;
+    butil::FlatMap<std::string, std::vector<std::function<void()>>> _blocked_ops;*/
+    std::unordered_map<std::string, std::unique_ptr<MVCCValue>> _kvs;
+    std::unordered_map<std::string, std::vector<std::function<void()>>> _blocked_ops;
     bthread::Mutex _latch;
 };
 
@@ -359,27 +359,27 @@ public:
     DISALLOW_COPY_AND_ASSIGN(TxIndexImpl);
     ~TxIndexImpl() = default;
 
-    virtual TxOpStatus WriteLock(const UserKey& key, const TxIdentifier& txid, std::function<void()> callback) override {
+    virtual TxOpStatus WriteLock(const std::string& key, const TxIdentifier& txid, std::function<void()> callback) override {
         auto bucket_num = butil::Hash(key) % FLAGS_latch_bucket_num;
         return _kvbs[bucket_num]->WriteLock(key, txid, callback);
     }
 
-    virtual TxOpStatus WriteIntent(const UserKey& key, const Value& v, const TxIdentifier& txid) override {
+    virtual TxOpStatus WriteIntent(const std::string& key, const Value& v, const TxIdentifier& txid) override {
         auto bucket_num = butil::Hash(key) % FLAGS_latch_bucket_num;
         return _kvbs[bucket_num]->WriteIntent(key, v, txid);
     }
 
-    virtual TxOpStatus Clean(const UserKey& key, const TxIdentifier& txid) override {
+    virtual TxOpStatus Clean(const std::string& key, const TxIdentifier& txid) override {
         auto bucket_num = butil::Hash(key) % FLAGS_latch_bucket_num;
         return _kvbs[bucket_num]->Clean(key, txid);
     }
 
-    virtual TxOpStatus Commit(const UserKey& key, const TxIdentifier& txid) override {
+    virtual TxOpStatus Commit(const std::string& key, const TxIdentifier& txid) override {
         auto bucket_num = butil::Hash(key) % FLAGS_latch_bucket_num;
         return _kvbs[bucket_num]->Commit(key, txid);
     }
 
-    virtual TxOpStatus Read(const UserKey& key, Value& v, const TxIdentifier& txid, std::function<void()> callback) override {
+    virtual TxOpStatus Read(const std::string& key, Value& v, const TxIdentifier& txid, std::function<void()> callback) override {
         auto bucket_num = butil::Hash(key) % FLAGS_latch_bucket_num;
         return _kvbs[bucket_num]->Read(key, v, txid, callback);
     }

@@ -40,7 +40,7 @@ namespace {
             if (_leveldbptr == nullptr) {
                 StorageStatus ss;
                 ss.set_error_code(StorageStatus::InvalidArgument);
-                ss.set_error_message("Already opened an leveldb");
+                ss.set_error_message("Haven't opened an leveldb");
                 return ss;
             }
             leveldb::WriteOptions opts;
@@ -57,7 +57,7 @@ namespace {
             if (_leveldbptr == nullptr) {
                 StorageStatus ss;
                 ss.set_error_code(StorageStatus::InvalidArgument);
-                ss.set_error_message("Already opened an leveldb");
+                ss.set_error_message("Haven't opened an leveldb");
                 return ss;
             }
             leveldb::WriteOptions opts;
@@ -78,7 +78,7 @@ namespace {
             if (_leveldbptr == nullptr) {
                 StorageStatus ss;
                 ss.set_error_code(StorageStatus::InvalidArgument);
-                ss.set_error_message("Already opened an leveldb");
+                ss.set_error_message("Haven't opened an leveldb");
                 return ss;
             }
             leveldb::ReadOptions opt;
@@ -93,7 +93,7 @@ namespace {
             if (_leveldbptr == nullptr) {
                 StorageStatus ss;
                 ss.set_error_code(StorageStatus::InvalidArgument);
-                ss.set_error_message("Already opened an leveldb");
+                ss.set_error_message("Haven't opened an leveldb");
                 return ss;
             }
             leveldb::ReadOptions opt;
