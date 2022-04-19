@@ -57,7 +57,7 @@ namespace {
             if (_leveldbptr == nullptr) {
                 StorageStatus ss;
                 ss.set_error_code(StorageStatus::InvalidArgument);
-                ss.set_error_message("Already opened an leveldb");
+                ss.set_error_message("Haven't opened an leveldb");
                 return ss;
             }
             leveldb::WriteOptions opts;
@@ -66,8 +66,8 @@ namespace {
             leveldb::WriteBatch batch;
 
             for (auto &data : datas) {
-                InternalKey key(*data.key, data.ts, data.is_delete);
-                batch.Put(key.Encode(), *data.value);
+                InternalKey key(data.key, data.ts, data.is_delete);
+                batch.Put(key.Encode(), data.value);
             }
             leveldbstatus = _leveldbptr->Write(opts, &batch);
             return LevelDBStatus(leveldbstatus);

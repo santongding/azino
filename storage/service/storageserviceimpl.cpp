@@ -158,7 +158,7 @@ namespace storage {
         std::vector<Storage::Data>datas;
         datas.reserve(request->datas_size());
         for (auto &d: request->datas()) {
-            datas.push_back({&d.key(), &d.value().content(), d.ts(), d.value().is_delete()});
+            datas.push_back({d.key(), d.value().content(), d.ts(), d.value().is_delete()});
         }
         StorageStatus ss = _storage->BatchStore(datas);
         if (ss.error_code() != StorageStatus::Ok) {

@@ -2,6 +2,7 @@
 #define AZINO_TXINDEX_INCLUDE_SERVICE_H
 
 #include <butil/macros.h>
+#include <string>
 
 #include "service/txindex/txindex.pb.h"
 
@@ -11,7 +12,7 @@ namespace txindex {
 
     class TxOpServiceImpl : public TxOpService {
     public:
-        TxOpServiceImpl();
+        TxOpServiceImpl(const std::string& storage_addr);
         DISALLOW_COPY_AND_ASSIGN(TxOpServiceImpl);
         ~TxOpServiceImpl();
 
