@@ -5,8 +5,8 @@
 
 namespace azino {
 namespace txindex {
-    TxOpServiceImpl::TxOpServiceImpl()
-    : _index(TxIndex::DefaultTxIndex()) {}
+    TxOpServiceImpl::TxOpServiceImpl(const std::string& storage_addr)
+    : _index(TxIndex::DefaultTxIndex(storage_addr)) {}
     TxOpServiceImpl::~TxOpServiceImpl() = default;
 
     void TxOpServiceImpl::WriteIntent(::google::protobuf::RpcController* controller,

@@ -6,6 +6,8 @@
 #include "service.h"
 
 DEFINE_string(txindex_addr, "0.0.0.0:8002", "Addresses of txindex");
+DEFINE_string(storage_addr, "0.0.0.0:8000", "Address of storage");
+
 namespace logging {
     DECLARE_bool(crash_on_fatal_log);
 }
@@ -22,7 +24,7 @@ int main(int argc, char* argv[]) {
 
     brpc::Server server;
 
-    azino::txindex::TxOpServiceImpl tx_op_service_impl;
+    azino::txindex::TxOpServiceImpl tx_op_service_impl(FLAGS_storage_addr);
     if (server.AddService(&tx_op_service_impl,
                           brpc::SERVER_DOESNT_OWN_SERVICE) != 0) {
         LOG(FATAL) << "Fail to add tx_op_service_impl";

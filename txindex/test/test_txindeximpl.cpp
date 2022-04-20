@@ -23,13 +23,17 @@ public:
 
     void dummyCallback() {
         LOG(INFO) << "Calling dummy call back.";
+        bthread_mutex_lock(&_m);
         bthread_cond_signal(&_cv);
+        _called = true;
+        bthread_mutex_unlock(&_m);
     }
 
     void waitDummyCallback() {
         bthread_mutex_lock(&_m);
-        bthread_cond_wait(&_cv, &_m);
-        _called = true;
+        while (!_called) {
+            bthread_cond_wait(&_cv, &_m);
+        }
         bthread_mutex_unlock(&_m);
     }
 
@@ -44,8 +48,7 @@ public:
 protected:
     void SetUp() {
         UnCalled();
-        FLAGS_enable_persistor = false;
-        ti = azino::txindex::TxIndex::DefaultTxIndex();
+        ti = azino::txindex::TxIndex::DefaultTxIndex("127.0.0.1:1080"); //  A dummy address
         t1.set_start_ts(1);
         t2.set_start_ts(2);
         v1.set_content("tx1value");
@@ -239,7 +242,9 @@ TEST_F(TxIndexImplTest, read_not_exist) {
 
 
 TEST_F(TxIndexImplTest, persist) {
+    std::vector<azino::txindex::DataToPersist> datas;
     ASSERT_EQ(azino::TxOpStatus_Code_Ok, ti->WriteIntent(k1, v1, t1).error_code());
+    ASSERT_EQ(ti->GetPersisting(datas).error_code(), azino::TxOpStatus_Code_NoneToPersist);
     t1.set_commit_ts(3);
     ASSERT_EQ(azino::TxOpStatus_Code_Ok, ti->Commit(k1, t1).error_code());
     t2.set_start_ts(4);
@@ -257,20 +262,13 @@ TEST_F(TxIndexImplTest, persist) {
     ASSERT_EQ(v1.content(), read_value.content());
     ASSERT_EQ(ti->Read(k1, read_value, read_tx_6, NULL).error_code(), azino::TxOpStatus_Code_Ok);
     ASSERT_EQ(v2.content(), read_value.content());
-    std::vector<azino::txindex::DataToPersist> datas;
-    auto bucket_num = butil::Hash(k1) % FLAGS_latch_bucket_num;
-    ASSERT_EQ(ti->GetPersisting(bucket_num, datas).error_code(), azino::TxOpStatus_Code_Ok);
+    ASSERT_EQ(ti->GetPersisting(datas).error_code(), azino::TxOpStatus_Code_Ok);
     ASSERT_EQ(datas.size(), 1);
-    ASSERT_EQ(datas[0].tvs.size(), 2);
-    for (auto &x: datas) {
-        for (auto &v: x.tvs) {
-            delete v.second;
-        }
-    }
-    ASSERT_EQ(ti->ClearPersisted(bucket_num, datas).error_code(), azino::TxOpStatus_Code_Ok);
-    ASSERT_EQ(ti->ClearPersisted(bucket_num, datas).error_code(), azino::TxOpStatus_Code_ClearRepeat);
+    ASSERT_EQ(datas[0].t2vs.size(), 2);
+    ASSERT_EQ(ti->ClearPersisted(datas).error_code(), azino::TxOpStatus_Code_Ok);
+    ASSERT_EQ(ti->ClearPersisted(datas).error_code(), azino::TxOpStatus_Code_ClearRepeat);
     datas.clear();
-    ASSERT_EQ(ti->GetPersisting(bucket_num, datas).error_code(), azino::TxOpStatus_Code_NoneToPersist);
+    ASSERT_EQ(ti->GetPersisting(datas).error_code(), azino::TxOpStatus_Code_NoneToPersist);
     ASSERT_EQ(datas.size(), 0);
     ASSERT_EQ(ti->Read(k1, read_value, read_tx_3, NULL).error_code(), azino::TxOpStatus_Code_ReadNotExist);
     ASSERT_EQ(ti->Read(k1, read_value, read_tx_6, NULL).error_code(), azino::TxOpStatus_Code_ReadNotExist);

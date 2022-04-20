@@ -7,16 +7,18 @@
 #include "gflags/gflags.h"
 
 #include <functional>
+#include <string>
 
 DECLARE_int32(latch_bucket_num);
 
 namespace azino {
 namespace txindex {
     struct DataToPersist;
+    typedef std::map<TimeStamp, std::shared_ptr<Value>, std::greater<TimeStamp>> MultiVersionValue;
     class TxIndex {
     public:
         // return the default index impl
-        static TxIndex* DefaultTxIndex();
+        static TxIndex* DefaultTxIndex(const std::string& storage_addr);
 
         TxIndex() = default;
 
@@ -28,33 +30,33 @@ namespace txindex {
         // This is an atomic read-write operation for one user_key, only used in pessimistic transactions.
         // Success when no newer version of this key, intent or lock exists.
         // Should success if txid already hold this lock.
-        virtual TxOpStatus WriteLock(const UserKey& key, const TxIdentifier& txid, std::function<void()> callback) = 0;
+        virtual TxOpStatus WriteLock(const std::string& key, const TxIdentifier& txid, std::function<void()> callback) = 0;
 
         // This is an atomic read-write operation for one user_key, used in both pessimistic and optimistic transactions.
         // Success when no newer version of this key, intent or lock exists.
         // Should success if txid already hold this intent or lock, and change lock to intent at the same time.
-        virtual TxOpStatus WriteIntent(const UserKey& key, const Value& v, const TxIdentifier& txid) = 0;
+        virtual TxOpStatus WriteIntent(const std::string& key, const Value& v, const TxIdentifier& txid) = 0;
 
         // This is an atomic read-write operation for one user_key, used in both pessimistic and optimistic transactions.
         // Success when it finds and cleans this tx's intent or lock for this key
-        virtual TxOpStatus Clean(const UserKey& key, const TxIdentifier& txid) = 0;
+        virtual TxOpStatus Clean(const std::string& key, const TxIdentifier& txid) = 0;
 
         // This is an atomic read-write operation for one user_key, used in both pessimistic and optimistic transactions.
         // Success when it finds and commit this tx's intent for this key
-        virtual TxOpStatus Commit(const UserKey& key, const TxIdentifier& txid) = 0;
+        virtual TxOpStatus Commit(const std::string& key, const TxIdentifier& txid) = 0;
 
         // Current implementation uses snapshot isolation.
         // read will be blocked if there exists and intent who has a smaller ts than read's ts.
         // read will bypass any lock, and return the key value pair who has the biggest ts among all that have ts smaller than read's ts.
-        virtual TxOpStatus Read(const UserKey& key, Value& v, const TxIdentifier& txid, std::function<void()> callback) = 0;
+        virtual TxOpStatus Read(const std::string& key, Value& v, const TxIdentifier& txid, std::function<void()> callback) = 0;
 
-        virtual TxOpStatus GetPersisting(uint32_t bucket_id, std::vector<DataToPersist> &datas) = 0;
+        virtual TxOpStatus GetPersisting(std::vector<DataToPersist> &datas) = 0;
 
-        virtual TxOpStatus ClearPersisted(uint32_t bucket_id, const std::vector<DataToPersist> &datas) = 0;
+        virtual TxOpStatus ClearPersisted(const std::vector<DataToPersist> &datas) = 0;
     };
     struct DataToPersist {
-        UserKey key;
-        std::vector<std::pair<TimeStamp, Value *>> tvs;//Values are copied from origin and stored in heap, and ordered by ts descending
+        std::string key;
+        MultiVersionValue t2vs;
     };
 } // namespace txindex
 } // namespace azino

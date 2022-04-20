@@ -11,6 +11,7 @@
 #include "index.h"
 
 DEFINE_int32(latch_bucket_num, 1024, "latch buckets number");
+DEFINE_bool(enable_persistor, false, "If enable persistor to persist data to storage server.");
 
 extern "C" void* CallbackWrapper(void* arg) {
     auto* func = reinterpret_cast<std::function<void()>*>(arg);
@@ -43,7 +44,7 @@ public:
     Value* IntentValue() const {
         return _intent_value.get();
     }
-    // finds greater or equal
+    // Finds committed values whose timestamp is smaller or equal than "ts"
     std::pair<TimeStamp, Value*> Seek(TimeStamp ts) {
         auto iter = _t2v.lower_bound(ts);
         if (iter == _t2v.end()) {
@@ -53,7 +54,7 @@ public:
     }
 
     // Truncate committed values whose timestamp is smaller or equal than "ts", return the number of values truncated
-    int Truncate(TimeStamp ts) {
+    unsigned Truncate(TimeStamp ts) {
         auto iter = _t2v.lower_bound(ts);
         auto ans = _t2v.size();
         _t2v.erase(iter, _t2v.end());
@@ -66,7 +67,7 @@ private:
     bool _has_intent;
     std::unique_ptr<Value> _intent_value;
     TxIdentifier _holder;
-    std::map<TimeStamp, std::unique_ptr<Value>, std::greater<TimeStamp>> _t2v;
+    txindex::MultiVersionValue _t2v;
 };
 
 class KVBucket : public txindex::TxIndex {
@@ -75,7 +76,7 @@ public:
     DISALLOW_COPY_AND_ASSIGN(KVBucket);
     ~KVBucket() = default;
 
-    virtual TxOpStatus WriteLock(const UserKey& key, const TxIdentifier& txid, std::function<void()> callback) override {
+    virtual TxOpStatus WriteLock(const std::string& key, const TxIdentifier& txid, std::function<void()> callback) override {
         std::lock_guard<bthread::Mutex> lck(_latch);
 
         TxOpStatus sts;
@@ -129,7 +130,7 @@ public:
         return sts;
     }
 
-    virtual TxOpStatus WriteIntent(const UserKey& key, const Value& v, const TxIdentifier& txid) override {
+    virtual TxOpStatus WriteIntent(const std::string& key, const Value& v, const TxIdentifier& txid) override {
         std::lock_guard<bthread::Mutex> lck(_latch);
 
         TxOpStatus sts;
@@ -193,7 +194,7 @@ public:
         return sts;
     }
 
-    virtual TxOpStatus Clean(const UserKey& key, const TxIdentifier& txid) override {
+    virtual TxOpStatus Clean(const std::string& key, const TxIdentifier& txid) override {
         std::lock_guard<bthread::Mutex> lck(_latch);
 
         TxOpStatus sts;
@@ -241,7 +242,7 @@ public:
         return sts;
     }
 
-    virtual TxOpStatus Commit(const UserKey& key, const TxIdentifier& txid) override {
+    virtual TxOpStatus Commit(const std::string& key, const TxIdentifier& txid) override {
         std::lock_guard<bthread::Mutex> lck(_latch);
 
         TxOpStatus sts;
@@ -289,7 +290,7 @@ public:
         return sts;
     }
 
-    virtual TxOpStatus Read(const UserKey& key, Value& v, const TxIdentifier& txid, std::function<void()> callback) override {
+    virtual TxOpStatus Read(const std::string& key, Value& v, const TxIdentifier& txid, std::function<void()> callback) override {
         std::lock_guard<bthread::Mutex> lck(_latch);
 
         TxOpStatus sts;
@@ -349,57 +350,62 @@ public:
         return sts;
     }
 
-    virtual TxOpStatus GetPersisting(uint32_t bucket_id, std::vector<txindex::DataToPersist> &datas) override {
+    virtual TxOpStatus GetPersisting(std::vector<txindex::DataToPersist> &datas) override {
         std::lock_guard<bthread::Mutex> lck(_latch);
 
-        int cnt = 0;
+        TxOpStatus sts;
+        std::stringstream ss;
+        unsigned long cnt = 0;
         for (auto &it: _kvs) {
             if (it.second->_t2v.empty()) {
                 continue;
             }
-            auto d = txindex::DataToPersist{.key = std::string(it.first)};
-            for (auto &x: it.second->_t2v) {
-                d.tvs.push_back({x.first, new Value(*x.second)});
-                cnt++;
-            }
+            txindex::DataToPersist d;
+            d.key = it.first;
+            d.t2vs = it.second->_t2v;
+            cnt += it.second->_t2v.size();
             datas.push_back(d);
         }
-        TxOpStatus sts;
         if (cnt == 0) {
             sts.set_error_code(TxOpStatus_Code_NoneToPersist);
         } else {
             sts.set_error_code(TxOpStatus_Code_Ok);
+            ss << "Get data to persist success. "
+               << "Persist key num: " << datas.size()
+               << "Persist value num: " << cnt;
+            sts.set_error_message(ss.str());
+            LOG(INFO) << ss.str();
         }
-        std::stringstream ss;
-        ss << " Get data to persist success. "
-           << " Persist key num: " << datas.size()
-           << " Persist value num: " << cnt;
-        sts.set_error_message(ss.str());
-        LOG(INFO) << ss.str();
         return sts;
     }
 
-    virtual TxOpStatus ClearPersisted(uint32_t bucket_id, const std::vector<txindex::DataToPersist> &datas) override {
+    virtual TxOpStatus ClearPersisted(const std::vector<txindex::DataToPersist> &datas) override {
         std::lock_guard<bthread::Mutex> lck(_latch);
 
         TxOpStatus sts;
-        sts.set_error_code(TxOpStatus_Code_Ok);
         std::stringstream ss;
+        unsigned long cnt = 0;
         for (auto &it: datas) {
-            assert(!it.tvs.empty());
-            if (_kvs.empty() || _kvs.find(it.key) == _kvs.end()) {
+            assert(!it.t2vs.empty());
+            if (_kvs.find(it.key) == _kvs.end()) {
                 sts.set_error_code(TxOpStatus_Code_ClearRepeat);
-                ss << " UserKey: " << it.key
-                   << " repeat clear due to no key in _kvs.\n";
-            } else if (it.tvs.size() != _kvs[it.key]->Truncate(it.tvs.begin()->first)) {
+                ss << "UserKey: " << it.key
+                   << "repeat clear due to no key in _kvs.";
+                break;
+            }
+            auto n = _kvs[it.key]->Truncate(it.t2vs.begin()->first);
+            cnt += n;
+            if (it.t2vs.size() != n) {
                 sts.set_error_code(TxOpStatus_Code_ClearRepeat);
-                ss << " UserKey: " << it.key
-                   << " repeat clear due to truncate number not match.\n";
+                ss << "UserKey: " << it.key
+                   << "repeat clear due to truncate number not match.";
+                break;
             }
         }
         if (sts.error_code() == TxOpStatus_Code_Ok) {
-            ss << " Clear persisted data success. "
-               << " Key num: " << datas.size();
+            ss << "Clear persisted data success. "
+               << "Clear persist key num: " << datas.size()
+               << "CLear persist value num: " << cnt;
             sts.set_error_message(ss.str());
             LOG(INFO) << ss.str();
         } else {
@@ -408,18 +414,19 @@ public:
         }
         return sts;
     }
+
 private:
-    /*butil::FlatMap<UserKey, std::unique_ptr<MVCCValue>> _kvs;
-    butil::FlatMap<UserKey, std::vector<std::function<void()>>> _blocked_ops;*/
-    std::unordered_map<UserKey, std::unique_ptr<MVCCValue>> _kvs;
-    std::unordered_map<UserKey, std::vector<std::function<void()>>> _blocked_ops;
+    std::unordered_map<std::string, std::unique_ptr<MVCCValue>> _kvs;
+    std::unordered_map<std::string, std::vector<std::function<void()>>> _blocked_ops;
     bthread::Mutex _latch;
 };
 
 class TxIndexImpl : public txindex::TxIndex {
 public:
-    TxIndexImpl() :
-    _kvbs(FLAGS_latch_bucket_num), _persistor(this, FLAGS_latch_bucket_num) {
+    TxIndexImpl(const std::string& storage_addr) :
+    _kvbs(FLAGS_latch_bucket_num),
+    _persistor(this, storage_addr),
+    _last_persist_bucket_num(0) {
         for (auto &it: _kvbs) {
             it.reset(new KVBucket());
         }
@@ -434,48 +441,58 @@ public:
         }
     }
 
-    virtual TxOpStatus WriteLock(const UserKey& key, const TxIdentifier& txid, std::function<void()> callback) override {
+    virtual TxOpStatus WriteLock(const std::string& key, const TxIdentifier& txid, std::function<void()> callback) override {
         auto bucket_num = butil::Hash(key) % FLAGS_latch_bucket_num;
         return _kvbs[bucket_num]->WriteLock(key, txid, callback);
     }
 
-    virtual TxOpStatus WriteIntent(const UserKey& key, const Value& v, const TxIdentifier& txid) override {
+    virtual TxOpStatus WriteIntent(const std::string& key, const Value& v, const TxIdentifier& txid) override {
         auto bucket_num = butil::Hash(key) % FLAGS_latch_bucket_num;
         return _kvbs[bucket_num]->WriteIntent(key, v, txid);
     }
 
-    virtual TxOpStatus Clean(const UserKey& key, const TxIdentifier& txid) override {
+    virtual TxOpStatus Clean(const std::string& key, const TxIdentifier& txid) override {
         auto bucket_num = butil::Hash(key) % FLAGS_latch_bucket_num;
         return _kvbs[bucket_num]->Clean(key, txid);
     }
 
-    virtual TxOpStatus Commit(const UserKey& key, const TxIdentifier& txid) override {
+    virtual TxOpStatus Commit(const std::string& key, const TxIdentifier& txid) override {
         auto bucket_num = butil::Hash(key) % FLAGS_latch_bucket_num;
         return _kvbs[bucket_num]->Commit(key, txid);
     }
 
-    virtual TxOpStatus Read(const UserKey& key, Value& v, const TxIdentifier& txid, std::function<void()> callback) override {
+    virtual TxOpStatus Read(const std::string& key, Value& v, const TxIdentifier& txid, std::function<void()> callback) override {
         auto bucket_num = butil::Hash(key) % FLAGS_latch_bucket_num;
         return _kvbs[bucket_num]->Read(key, v, txid, callback);
     }
 
-    virtual TxOpStatus GetPersisting(uint32_t bucket_id, std::vector<txindex::DataToPersist> &datas) override{
-        return _kvbs[bucket_id % FLAGS_latch_bucket_num]->GetPersisting(bucket_id, datas);
+    virtual TxOpStatus GetPersisting(std::vector<txindex::DataToPersist> &datas) override {
+        TxOpStatus res;
+        for (int i = 0; i < FLAGS_latch_bucket_num; i++) {
+            _last_persist_bucket_num++;
+            res = _kvbs[_last_persist_bucket_num % FLAGS_latch_bucket_num]->GetPersisting(datas);
+            if (res.error_code() == TxOpStatus_Code_Ok) {
+                assert(!datas.empty());
+                return res;
+            }
+        }
+        return res;
     }
 
-    virtual TxOpStatus ClearPersisted(uint32_t bucket_id,const std::vector<txindex::DataToPersist> &datas) override{
-        return _kvbs[bucket_id % FLAGS_latch_bucket_num]->ClearPersisted(bucket_id, datas);
+    virtual TxOpStatus ClearPersisted(const std::vector<txindex::DataToPersist> &datas) override {
+        return _kvbs[_last_persist_bucket_num % FLAGS_latch_bucket_num]->ClearPersisted(datas);
     }
 private:
-    std::vector<std::shared_ptr<KVBucket>> _kvbs;
+    std::vector<std::unique_ptr<KVBucket>> _kvbs;
     txindex::Persistor _persistor;
+    uint32_t _last_persist_bucket_num;
 };
 
 } // namespace
 
 namespace txindex {
-    TxIndex* TxIndex::DefaultTxIndex() {
-        return new TxIndexImpl();
+    TxIndex* TxIndex::DefaultTxIndex(const std::string& storage_addr) {
+        return new TxIndexImpl(storage_addr);
     }
 } // namespace txindex
 

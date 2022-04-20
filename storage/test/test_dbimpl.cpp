@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 #include <leveldb/db.h>
 #include <string>
-#include "service/kv.pb.h"
 
 #include "storage.h"
 #include "utils.h"
@@ -38,7 +37,7 @@ TEST_F(DBImplTest, crud) {
 
 TEST_F(DBImplTest, mvcc) {
     std::string seeked_key,seeked_value;
-    uint64_t seeked_ts;
+    azino::TimeStamp seeked_ts;
     ASSERT_TRUE(storage->Put("MVCDKEYmvccffffffffffffffff0", "world1").error_code() == azino::storage::StorageStatus_Code_Ok);
     ASSERT_TRUE(storage->MVCCGet("mvcc",0,seeked_value,seeked_ts).error_code()==azino::storage::StorageStatus_Code_NotFound);
     ASSERT_TRUE(storage->MVCCPut("mvcc",5,"123").error_code()==azino::storage::StorageStatus_Code_Ok);
@@ -89,7 +88,7 @@ TEST_F(DBImplTest, mvccbatch) {
     };
     for (auto &tp: kvs) {
         datas.push_back(
-                {&std::get<0>(tp), &std::get<2>(tp)->content(), std::get<1>(tp), std::get<2>(tp)->is_delete()});
+                {std::get<0>(tp), std::get<2>(tp)->content(), std::get<1>(tp), std::get<2>(tp)->is_delete()});
     }
 
     ASSERT_EQ(storage->BatchStore(datas).error_code(), azino::storage::StorageStatus_Code_Ok);
